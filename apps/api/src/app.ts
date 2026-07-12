@@ -2,10 +2,14 @@ import cors from "cors";
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import { createEvidenceSeal, evaluateTransaction } from "@prismpulse/core";
-import { transactionIntentSchema } from "@prismpulse/schemas";
+import { digestSchema, transactionIntentSchema } from "@prismpulse/schemas";
 import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
+import {
+  createEvidenceSealStore,
+  type EvidenceSealStore,
+} from "./seals.js";
 import {
   collectXLayerEvidence,
   EvidenceUnavailableError,
@@ -18,6 +22,7 @@ const checkRequestSchema = z.object({
 
 export interface AppOptions {
   collectEvidence?: (intent: TransactionIntent) => Promise<PulseInspection>;
+  sealStore?: EvidenceSealStore;
 }
 
 function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
@@ -53,6 +58,7 @@ export function createApp(options: AppOptions = {}): Express {
   const app = express();
   const paymentGate = createPaymentGate(process.env);
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
+  const sealStore = options.sealStore ?? createEvidenceSealStore(process.env);
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(helmet());
@@ -74,6 +80,32 @@ export function createApp(options: AppOptions = {}): Express {
       paidRoutesEnabled: paymentGate.enabled,
       capabilities: ["pulse-inspection", "sentinel-check", "evidence-receipts"],
     });
+  });
+
+  app.get("/v1/seals/:decisionDigest", async (request, response) => {
+    const parsed = digestSchema.safeParse(request.params.decisionDigest);
+    if (!parsed.success) {
+      response.status(400).json({
+        error: "INVALID_DIGEST",
+        message: "A lowercase 32-byte decision digest is required.",
+      });
+      return;
+    }
+
+    try {
+      const record = await sealStore.findByDecisionDigest(parsed.data);
+      if (!record) {
+        response.status(404).json({ error: "SEAL_NOT_FOUND" });
+        return;
+      }
+      response.setHeader("Cache-Control", "public, max-age=60, immutable");
+      response.json(record);
+    } catch {
+      response.status(503).json({
+        error: "SEAL_STORE_UNAVAILABLE",
+        message: "Evidence Seal storage is temporarily unavailable.",
+      });
+    }
   });
 
   app.post("/v1/pulse/inspect", createPulseRateLimit(), async (request, response) => {
@@ -125,10 +157,23 @@ export function createApp(options: AppOptions = {}): Express {
         inspection.evidence,
       );
 
-      response.json({
+      const seal = createEvidenceSeal(parsed.data.intent, verdict);
+      const record = {
         verdict,
-        seal: createEvidenceSeal(parsed.data.intent, verdict),
-      });
+        seal,
+        intent: parsed.data.intent,
+        storedAt: new Date().toISOString(),
+      };
+      try {
+        await sealStore.save(record);
+      } catch {
+        response.status(503).json({
+          error: "SEAL_PERSISTENCE_FAILED",
+          message: "The verdict was not issued because its Evidence Seal could not be persisted.",
+        });
+        return;
+      }
+      response.status(201).json(record);
     } catch (error) {
       response.status(502).json({
         error: "EVIDENCE_UNAVAILABLE",

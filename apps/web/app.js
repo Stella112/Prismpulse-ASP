@@ -222,23 +222,35 @@ function sealRows(seal) {
   ];
 }
 
-document.querySelector("#seal-form").addEventListener("submit", (event) => {
+document.querySelector("#seal-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const error = document.querySelector("#seal-error");
+  const button = document.querySelector("#seal-search-button");
   error.textContent = "";
+  const digest = document.querySelector("#seal-digest").value.trim();
+  if (!digestPattern.test(digest)) {
+    error.textContent = "Enter a lowercase 32-byte decision digest.";
+    return;
+  }
+  button.disabled = true;
+  button.firstElementChild.textContent = "Retrieving";
   try {
-    const seal = JSON.parse(document.querySelector("#seal-json").value);
-    if (seal.version !== "1") throw new Error("Unsupported Seal version.");
-    if (seal.network !== "eip155:196") throw new Error("Seal is not for X Layer mainnet.");
-    if (!["ALLOW", "WARN", "BLOCK"].includes(seal.verdict)) throw new Error("Invalid verdict.");
-    for (const field of ["intentDigest", "evidenceDigest", "decisionDigest"]) {
-      if (!digestPattern.test(seal[field] ?? "")) throw new Error(`Invalid ${field}.`);
+    const response = await fetch(`${API_BASE}/v1/seals/${digest}`, {
+      headers: { accept: "application/json" },
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        response.status === 404
+          ? "No persisted Seal matches this digest."
+          : payload.message ?? `Seal lookup failed (${response.status}).`,
+      );
     }
-    if (Number.isNaN(Date.parse(seal.createdAt))) throw new Error("Invalid creation time.");
+    const { seal, verdict, storedAt } = payload;
 
     const details = document.querySelector("#seal-details");
     details.replaceChildren(
-      ...sealRows(seal).map(([label, value]) => {
+      ...[...sealRows(seal), ["Score", `${verdict.score} / 100`], ["Stored", storedAt]].map(([label, value]) => {
         const row = document.createElement("div");
         const term = document.createElement("dt");
         const description = document.createElement("dd");
@@ -248,12 +260,28 @@ document.querySelector("#seal-form").addEventListener("submit", (event) => {
         return row;
       }),
     );
+    const evidence = Array.isArray(verdict.evidence) ? verdict.evidence : [];
+    document.querySelector("#seal-evidence-list").replaceChildren(
+      ...evidence.map(evidenceItem),
+    );
+    document.querySelector("#seal-evidence-count").textContent = `${evidence.length} claim${evidence.length === 1 ? "" : "s"}`;
     document.querySelector("#seal-empty").hidden = true;
-    details.hidden = false;
+    document.querySelector("#seal-result").hidden = false;
+    window.history.replaceState(null, "", `#seals/${digest}`);
   } catch (sealError) {
-    error.textContent = sealError instanceof SyntaxError ? "Seal JSON is invalid." : sealError.message;
+    error.textContent = sealError.message;
+  } finally {
+    button.disabled = false;
+    button.firstElementChild.textContent = "Retrieve Seal";
   }
 });
+
+const hashSealDigest = window.location.hash.match(/^#seals\/(0x[a-f0-9]{64})$/)?.[1];
+if (hashSealDigest) {
+  switchView("seals");
+  document.querySelector("#seal-digest").value = hashSealDigest;
+  document.querySelector("#seal-form").requestSubmit();
+}
 
 sealButton.addEventListener("click", () => {
   sealNote.textContent = "Use the paid A2MCP endpoint from an x402-compatible agent.";

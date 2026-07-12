@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import type { PulseInspection } from "./pulse.js";
+import { MemoryEvidenceSealStore } from "./seals.js";
 
 const validRequest = {
   intent: {
@@ -56,19 +57,35 @@ afterEach(() => {
   }
 });
 
-async function post(path: string, body: unknown): Promise<Response> {
-  server = createApp({ collectEvidence: async () => inspection }).listen(
+async function request(
+  path: string,
+  options: RequestInit = {},
+  sealStore = new MemoryEvidenceSealStore(),
+): Promise<Response> {
+  server = createApp({ collectEvidence: async () => inspection, sealStore }).listen(
     0,
     "127.0.0.1",
   );
   await new Promise<void>((resolve) => server!.once("listening", resolve));
   const { port } = server.address() as AddressInfo;
 
-  return fetch(`http://127.0.0.1:${port}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return fetch(`http://127.0.0.1:${port}${path}`, options);
+}
+
+async function post(
+  path: string,
+  body: unknown,
+  sealStore?: MemoryEvidenceSealStore,
+): Promise<Response> {
+  return request(
+    path,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    sealStore,
+  );
 }
 
 describe("POST /v1/sentinel/check", () => {
@@ -81,7 +98,7 @@ describe("POST /v1/sentinel/check", () => {
       seal: { network: string; decisionDigest: string };
     };
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(body.verdict.verdict).toBe("ALLOW");
     expect(body.seal.network).toBe("eip155:196");
     expect(body.seal.decisionDigest).toMatch(/^0x[a-f0-9]{64}$/);
@@ -109,6 +126,58 @@ describe("POST /v1/sentinel/check", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       error: "PAID_ROUTE_NOT_CONFIGURED",
+    });
+  });
+});
+
+describe("Evidence Seal persistence and retrieval", () => {
+  it("retrieves a persisted decision by its digest", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.PAYMENTS_ENABLED = "false";
+    const store = new MemoryEvidenceSealStore();
+    const issued = await post("/v1/sentinel/check", validRequest, store);
+    const issuedBody = (await issued.json()) as {
+      seal: { decisionDigest: string };
+    };
+    server?.close();
+    server = undefined;
+
+    const response = await request(
+      `/v1/seals/${issuedBody.seal.decisionDigest}`,
+      {},
+      store,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("immutable");
+    await expect(response.json()).resolves.toMatchObject({
+      seal: { decisionDigest: issuedBody.seal.decisionDigest, verdict: "ALLOW" },
+      verdict: { verdict: "ALLOW" },
+      intent: validRequest.intent,
+    });
+  });
+
+  it("returns 404 for a well-formed unknown digest", async () => {
+    const response = await request(`/v1/seals/0x${"0".repeat(64)}`);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: "SEAL_NOT_FOUND" });
+  });
+
+  it("rejects malformed digest lookups", async () => {
+    const response = await request("/v1/seals/not-a-digest");
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "INVALID_DIGEST" });
+  });
+
+  it("does not issue a seal when persistence fails", async () => {
+    const store = new MemoryEvidenceSealStore();
+    store.save = async () => {
+      throw new Error("database offline");
+    };
+    const response = await post("/v1/sentinel/check", validRequest, store);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "SEAL_PERSISTENCE_FAILED",
     });
   });
 });

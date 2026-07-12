@@ -140,15 +140,20 @@
           </div>
           <div class="seal-layout">
             <form class="inspection-panel" id="seal-form">
-              <div class="panel-heading"><div><h2>Inspect receipt</h2></div><span class="chain-chip">v1</span></div>
-              <label>Seal JSON<textarea id="seal-json" rows="12" spellcheck="false" placeholder='{"version":"1", ...}'></textarea></label>
+              <div class="panel-heading"><div><h2>Find a sealed decision</h2></div><span class="chain-chip">v1</span></div>
+              <label>Decision digest<input id="seal-digest" spellcheck="false" autocomplete="off" placeholder="0x..." /></label>
+              <p class="explorer-help">Enter the canonical digest returned by Sentinel. Persisted intent, verdict, and evidence are loaded from PrismPulse.</p>
               <div class="form-error" id="seal-error" role="alert"></div>
-              <button class="primary-action" type="submit"><span>Check structure</span><span aria-hidden="true">-&gt;</span></button>
+              <button class="primary-action" id="seal-search-button" type="submit"><span>Retrieve Seal</span><span aria-hidden="true">-&gt;</span></button>
             </form>
             <section class="result-panel">
               <div class="panel-heading"><div><p class="section-label">RECEIPT</p><h2>Seal details</h2></div></div>
               <div class="empty-state compact" id="seal-empty"><strong>No receipt loaded</strong></div>
-              <dl class="seal-details" id="seal-details" hidden></dl>
+              <div id="seal-result" hidden>
+                <dl class="seal-details" id="seal-details"></dl>
+                <div class="evidence-heading"><span>Decision evidence</span><span id="seal-evidence-count"></span></div>
+                <div class="evidence-list" id="seal-evidence-list"></div>
+              </div>
             </section>
           </div>
         </section>

@@ -618,6 +618,13 @@ textarea::placeholder {
   margin-top: 0;
 }
 
+.explorer-help {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 .seal-details {
   margin: 0;
 }

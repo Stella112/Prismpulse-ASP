@@ -22,6 +22,7 @@ PORT=4021
 PUBLIC_BASE_URL=https://api.getprismpulse.xyz
 POSTGRES_PASSWORD=${postgres_password}
 DATABASE_URL=postgresql://prismpulse:${postgres_password}@postgres:5432/prismpulse
+EVIDENCE_SEAL_DIR=/app/data/seals
 XLAYER_NETWORK=eip155:196
 XLAYER_RPC_URL=https://rpc.xlayer.tech
 RECEIPT_ANCHOR_ADDRESS=

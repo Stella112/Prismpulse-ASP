@@ -7,6 +7,9 @@ services:
     env_file: .env
     environment:
       NODE_OPTIONS: --max-old-space-size=512
+      EVIDENCE_SEAL_DIR: /app/data/seals
+    volumes:
+      - evidence_seals:/app/data/seals
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,5 +60,6 @@ services:
 
 volumes:
   postgres_data:
+  evidence_seals:
   caddy_data:
   caddy_config:
