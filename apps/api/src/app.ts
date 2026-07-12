@@ -1,5 +1,5 @@
 import cors from "cors";
-import express, { type Express } from "express";
+import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import { createEvidenceSeal, evaluateTransaction } from "@prismpulse/core";
 import { transactionIntentSchema } from "@prismpulse/schemas";
@@ -20,11 +20,41 @@ export interface AppOptions {
   collectEvidence?: (intent: TransactionIntent) => Promise<PulseInspection>;
 }
 
+function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
+  const clients = new Map<string, { count: number; resetsAt: number }>();
+
+  return (request, response, next) => {
+    const now = Date.now();
+    const key = request.ip ?? request.socket.remoteAddress ?? "unknown";
+    const current = clients.get(key);
+    const entry =
+      current && current.resetsAt > now
+        ? current
+        : { count: 0, resetsAt: now + windowMs };
+    entry.count += 1;
+    clients.set(key, entry);
+
+    response.setHeader("RateLimit-Limit", String(limit));
+    response.setHeader("RateLimit-Remaining", String(Math.max(0, limit - entry.count)));
+    response.setHeader("RateLimit-Reset", String(Math.ceil(entry.resetsAt / 1000)));
+
+    if (entry.count > limit) {
+      response.status(429).json({
+        error: "RATE_LIMITED",
+        message: "Pulse inspection limit reached. Try again shortly.",
+      });
+      return;
+    }
+    next();
+  };
+}
+
 export function createApp(options: AppOptions = {}): Express {
   const app = express();
   const paymentGate = createPaymentGate(process.env);
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
   app.use(helmet());
   app.use(cors({ origin: false }));
   app.use(express.json({ limit: "256kb" }));
@@ -46,7 +76,7 @@ export function createApp(options: AppOptions = {}): Express {
     });
   });
 
-  app.post("/v1/pulse/inspect", async (request, response) => {
+  app.post("/v1/pulse/inspect", createPulseRateLimit(), async (request, response) => {
     const parsed = checkRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       response.status(400).json({

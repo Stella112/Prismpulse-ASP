@@ -4,6 +4,8 @@
 
 Sentinel verdicts are deterministic. Model output may explain evidence or propose an investigation, but it cannot lower risk, override a policy, authorize a transaction, activate a Hive signature, approve coverage, or trigger a payout.
 
+Clients submit transaction intent, never authoritative risk signals. Pulse derives chain identity, block context, destination bytecode, and simulation outcome from the configured X Layer RPC. Missing Hive signature coverage remains visible and raises risk until the registry is active.
+
 ## Evidence rules
 
 - Every factual claim identifies its source and observation time.

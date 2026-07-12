@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d0e" />
+    <meta
+      name="description"
+      content="PrismPulse transaction evidence and underwriting console for X Layer."
+    />
+    <title>PrismPulse Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#pulse" aria-label="PrismPulse Pulse Console">
+          <span class="brand-mark" aria-hidden="true"><i></i></span>
+          <span><strong>PrismPulse</strong><small>Transaction intelligence</small></span>
+        </a>
+
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <button class="nav-item active" data-view="pulse" type="button">
+            <span aria-hidden="true">P</span>Pulse
+          </button>
+          <button class="nav-item" data-view="seals" type="button">
+            <span aria-hidden="true">S</span>Seals
+          </button>
+          <button class="nav-item" data-view="hive" type="button">
+            <span aria-hidden="true">H</span>Hive
+          </button>
+          <button class="nav-item" data-view="system" type="button">
+            <span aria-hidden="true">O</span>System
+          </button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="network-state">
+            <span class="status-dot" id="sidebar-status"></span>
+            <span><strong>X Layer</strong><small>Chain 196</small></span>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">PRISMPULSE / <span id="view-crumb">PULSE</span></p>
+            <h1 id="view-title">Pulse Console</h1>
+          </div>
+          <div class="topbar-status" aria-live="polite">
+            <span class="status-dot" id="api-dot"></span>
+            <span id="api-status">Connecting</span>
+          </div>
+        </header>
+
+        <section class="view active" id="view-pulse" aria-labelledby="view-title">
+          <div class="metrics-band">
+            <div><span>Network</span><strong>eip155:196</strong></div>
+            <div><span>Evidence source</span><strong id="rpc-label">X Layer RPC</strong></div>
+            <div><span>Payment rail</span><strong id="payment-state">Checking</strong></div>
+            <div><span>Seal registry</span><strong>Awaiting deploy</strong></div>
+          </div>
+
+          <div class="workspace-grid">
+            <form class="inspection-panel" id="inspection-form" novalidate>
+              <div class="panel-heading">
+                <div><p class="section-label">TRANSACTION INTENT</p><h2>Inspect on X Layer</h2></div>
+                <span class="chain-chip">196</span>
+              </div>
+
+              <label>
+                From
+                <input id="from" name="from" autocomplete="off" spellcheck="false" placeholder="0x..." required />
+              </label>
+              <label>
+                To
+                <input id="to" name="to" autocomplete="off" spellcheck="false" placeholder="0x..." required />
+              </label>
+
+              <div class="form-row">
+                <label>
+                  Value (wei)
+                  <input id="value" name="value" inputmode="numeric" value="0" required />
+                </label>
+                <label>
+                  Expected recipient
+                  <input id="expected-recipient" name="expectedRecipient" autocomplete="off" spellcheck="false" placeholder="Optional" />
+                </label>
+              </div>
+
+              <label>
+                Calldata
+                <textarea id="calldata" name="data" rows="3" spellcheck="false">0x</textarea>
+              </label>
+              <label>
+                Declared purpose
+                <input id="purpose" name="declaredPurpose" maxlength="500" placeholder="Describe the intended outcome" required />
+              </label>
+
+              <div class="form-error" id="form-error" role="alert"></div>
+              <div class="form-actions">
+                <button class="primary-action" id="inspect-button" type="submit">
+                  <span>Run Pulse</span><span aria-hidden="true">-&gt;</span>
+                </button>
+                <button class="secondary-action" id="clear-button" type="button">Clear</button>
+              </div>
+            </form>
+
+            <section class="result-panel" aria-live="polite">
+              <div class="panel-heading">
+                <div><p class="section-label">LIVE EVIDENCE</p><h2>Inspection result</h2></div>
+                <span class="result-state idle" id="result-state">Idle</span>
+              </div>
+
+              <div class="empty-state" id="empty-result">
+                <div class="pulse-visual" aria-hidden="true"><span></span><i></i></div>
+                <strong>No active inspection</strong>
+              </div>
+
+              <div class="result-content" id="result-content" hidden>
+                <div class="signal-grid" id="signal-grid"></div>
+                <div class="evidence-heading">
+                  <span>Evidence claims</span><span id="block-number">Block -</span>
+                </div>
+                <div class="evidence-list" id="evidence-list"></div>
+                <button class="seal-action" id="seal-button" type="button" disabled>
+                  Underwrite and Seal
+                </button>
+                <p class="action-note" id="seal-note">Payment setup pending.</p>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-seals" aria-labelledby="view-title">
+          <div class="section-intro">
+            <p class="section-label">EVIDENCE RECEIPTS</p>
+            <p>Canonical decision digests issued by Sentinel.</p>
+          </div>
+          <div class="seal-layout">
+            <form class="inspection-panel" id="seal-form">
+              <div class="panel-heading"><div><h2>Inspect receipt</h2></div><span class="chain-chip">v1</span></div>
+              <label>Seal JSON<textarea id="seal-json" rows="12" spellcheck="false" placeholder='{"version":"1", ...}'></textarea></label>
+              <div class="form-error" id="seal-error" role="alert"></div>
+              <button class="primary-action" type="submit"><span>Check structure</span><span aria-hidden="true">-&gt;</span></button>
+            </form>
+            <section class="result-panel">
+              <div class="panel-heading"><div><p class="section-label">RECEIPT</p><h2>Seal details</h2></div></div>
+              <div class="empty-state compact" id="seal-empty"><strong>No receipt loaded</strong></div>
+              <dl class="seal-details" id="seal-details" hidden></dl>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-hive" aria-labelledby="view-title">
+          <div class="section-intro"><p class="section-label">SIGNATURE INTELLIGENCE</p><p>Reviewed attack patterns available to Sentinel.</p></div>
+          <div class="state-table">
+            <div class="table-head"><span>Registry</span><span>Status</span><span>Activation</span></div>
+            <div class="table-row"><strong>Hive Core</strong><span class="state-warning">Not active</span><span>Review gate required</span></div>
+            <div class="table-row"><strong>Known signatures</strong><span>0</span><span>No production entries</span></div>
+            <div class="table-row"><strong>Honeypot intake</strong><span class="state-warning">Offline</span><span>Worker pending</span></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-system" aria-labelledby="view-title">
+          <div class="section-intro"><p class="section-label">RUNTIME</p><p>Current production service boundaries.</p></div>
+          <div class="state-table" id="system-table">
+            <div class="table-head"><span>Service</span><span>Status</span><span>Endpoint</span></div>
+            <div class="table-row"><strong>Sentinel API</strong><span id="system-api">Checking</span><span>api.getprismpulse.xyz</span></div>
+            <div class="table-row"><strong>X Layer RPC</strong><span>Configured</span><span>rpc.xlayer.tech</span></div>
+            <div class="table-row"><strong>Seal Registry</strong><span class="state-warning">Not deployed</span><span>Mainnet pending</span></div>
+            <div class="table-row"><strong>OKX Payments</strong><span id="system-payments">Checking</span><span>Exact / X Layer</span></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
