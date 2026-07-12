@@ -1,0 +1,12 @@
+node_modules/
+contracts/cache/
+contracts/out/
+dist/
+.turbo/
+.next/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+data/

@@ -1,0 +1,5 @@
+api.getprismpulse.xyz {
+  encode zstd gzip
+  reverse_proxy api:4021
+}
+
