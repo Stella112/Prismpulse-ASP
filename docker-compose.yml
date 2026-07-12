@@ -10,6 +10,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4021/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     mem_limit: 768m
 
   postgres:
@@ -47,4 +58,3 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
-

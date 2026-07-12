@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR=${APP_DIR:-/opt/prismpulse/app}
+REPOSITORY=${REPOSITORY:-https://github.com/Stella112/Prismpulse-ASP.git}
+
+if [[ ! -d ${APP_DIR}/.git ]]; then
+  git clone --branch main --single-branch "${REPOSITORY}" "${APP_DIR}"
+else
+  git -C "${APP_DIR}" pull --ff-only origin main
+fi
+
+cd "${APP_DIR}"
+umask 077
+
+if [[ ! -f .env ]]; then
+  postgres_password=$(openssl rand -hex 32)
+  cat >.env <<EOF
+COMPOSE_PROJECT_NAME=prismpulse
+NODE_ENV=production
+PORT=4021
+PUBLIC_BASE_URL=https://api.getprismpulse.xyz
+POSTGRES_PASSWORD=${postgres_password}
+DATABASE_URL=postgresql://prismpulse:${postgres_password}@postgres:5432/prismpulse
+XLAYER_NETWORK=eip155:196
+XLAYER_RPC_URL=https://rpc.xlayer.tech
+RECEIPT_ANCHOR_ADDRESS=
+COVERAGE_POOL_ADDRESS=
+PAYMENTS_ENABLED=false
+OKX_API_KEY=
+OKX_SECRET_KEY=
+OKX_PASSPHRASE=
+OKX_BASE_URL=https://web3.okx.com
+PAY_TO_ADDRESS=
+SENTINEL_PRICE_USD=\$0.01
+LLM_PROVIDER=
+LLM_API_KEY=
+LLM_MODEL=
+EOF
+  chmod 0600 .env
+fi
+
+docker compose config --quiet
+docker compose build --pull
+docker compose up -d --remove-orphans
+docker compose ps
+
+echo "PrismPulse deployment completed at $(git rev-parse --short HEAD)."
