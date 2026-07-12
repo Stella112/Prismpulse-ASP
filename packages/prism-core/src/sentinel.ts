@@ -8,7 +8,7 @@ import type {
 export interface SentinelSignals {
   simulationSucceeded: boolean;
   approvalIsUnlimited: boolean;
-  knownAttackSignature: boolean;
+  knownAttackSignature?: boolean;
   priceImpactBps?: number;
   contractVerified?: boolean;
 }
@@ -39,6 +39,11 @@ export function evaluateTransaction(
   if (signals.knownAttackSignature) {
     reasonCodes.push("KNOWN_ATTACK_SIGNATURE");
     score += 100;
+  }
+
+  if (signals.knownAttackSignature === undefined) {
+    reasonCodes.push("SIGNATURE_SCAN_UNAVAILABLE");
+    score += 25;
   }
 
   if (signals.approvalIsUnlimited) {
@@ -93,4 +98,3 @@ export function evaluateTransaction(
     createdAt: new Date().toISOString(),
   };
 }
-

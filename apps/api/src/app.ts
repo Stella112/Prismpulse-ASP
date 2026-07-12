@@ -2,28 +2,28 @@ import cors from "cors";
 import express, { type Express } from "express";
 import helmet from "helmet";
 import { createEvidenceSeal, evaluateTransaction } from "@prismpulse/core";
-import {
-  evidenceClaimSchema,
-  transactionIntentSchema,
-} from "@prismpulse/schemas";
+import { transactionIntentSchema } from "@prismpulse/schemas";
+import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
+import {
+  collectXLayerEvidence,
+  EvidenceUnavailableError,
+  type PulseInspection,
+} from "./pulse.js";
 
 const checkRequestSchema = z.object({
   intent: transactionIntentSchema,
-  signals: z.object({
-    simulationSucceeded: z.boolean(),
-    approvalIsUnlimited: z.boolean(),
-    knownAttackSignature: z.boolean(),
-    priceImpactBps: z.number().int().min(0).optional(),
-    contractVerified: z.boolean().optional(),
-  }),
-  evidence: z.array(evidenceClaimSchema),
 });
 
-export function createApp(): Express {
+export interface AppOptions {
+  collectEvidence?: (intent: TransactionIntent) => Promise<PulseInspection>;
+}
+
+export function createApp(options: AppOptions = {}): Express {
   const app = express();
   const paymentGate = createPaymentGate(process.env);
+  const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
   app.disable("x-powered-by");
   app.use(helmet());
   app.use(cors({ origin: false }));
@@ -42,12 +42,34 @@ export function createApp(): Express {
       version: "0.1.0",
       network: "eip155:196",
       paidRoutesEnabled: paymentGate.enabled,
-      capabilities: ["sentinel-check", "evidence-receipts"],
+      capabilities: ["pulse-inspection", "sentinel-check", "evidence-receipts"],
     });
   });
 
-  // Development-only until OKX payment verification is mounted around this route.
-  app.post("/v1/sentinel/check", (request, response) => {
+  app.post("/v1/pulse/inspect", async (request, response) => {
+    const parsed = checkRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({
+        error: "INVALID_REQUEST",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    try {
+      response.json(await collectEvidence(parsed.data.intent));
+    } catch (error) {
+      response.status(502).json({
+        error: "EVIDENCE_UNAVAILABLE",
+        message:
+          error instanceof EvidenceUnavailableError
+            ? error.message
+            : "X Layer evidence collection failed.",
+      });
+    }
+  });
+
+  app.post("/v1/sentinel/check", async (request, response) => {
     if (process.env.NODE_ENV === "production" && !paymentGate.enabled) {
       response.status(503).json({
         error: "PAID_ROUTE_NOT_CONFIGURED",
@@ -65,27 +87,27 @@ export function createApp(): Express {
       return;
     }
 
-    const { signals } = parsed.data;
-    const verdict = evaluateTransaction(
-      parsed.data.intent,
-      {
-        simulationSucceeded: signals.simulationSucceeded,
-        approvalIsUnlimited: signals.approvalIsUnlimited,
-        knownAttackSignature: signals.knownAttackSignature,
-        ...(signals.priceImpactBps === undefined
-          ? {}
-          : { priceImpactBps: signals.priceImpactBps }),
-        ...(signals.contractVerified === undefined
-          ? {}
-          : { contractVerified: signals.contractVerified }),
-      },
-      parsed.data.evidence,
-    );
+    try {
+      const inspection = await collectEvidence(parsed.data.intent);
+      const verdict = evaluateTransaction(
+        parsed.data.intent,
+        inspection.signals,
+        inspection.evidence,
+      );
 
-    response.json({
-      verdict,
-      seal: createEvidenceSeal(parsed.data.intent, verdict),
-    });
+      response.json({
+        verdict,
+        seal: createEvidenceSeal(parsed.data.intent, verdict),
+      });
+    } catch (error) {
+      response.status(502).json({
+        error: "EVIDENCE_UNAVAILABLE",
+        message:
+          error instanceof EvidenceUnavailableError
+            ? error.message
+            : "X Layer evidence collection failed.",
+      });
+    }
   });
 
   return app;

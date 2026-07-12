@@ -2,6 +2,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
+import type { PulseInspection } from "./pulse.js";
 
 const validRequest = {
   intent: {
@@ -12,6 +13,10 @@ const validRequest = {
     data: "0x",
     declaredPurpose: "Pay a verified service provider",
   },
+};
+
+const inspection: PulseInspection = {
+  blockNumber: "123",
   signals: {
     simulationSucceeded: true,
     approvalIsUnlimited: false,
@@ -51,12 +56,15 @@ afterEach(() => {
   }
 });
 
-async function postCheck(body: unknown): Promise<Response> {
-  server = createApp().listen(0, "127.0.0.1");
+async function post(path: string, body: unknown): Promise<Response> {
+  server = createApp({ collectEvidence: async () => inspection }).listen(
+    0,
+    "127.0.0.1",
+  );
   await new Promise<void>((resolve) => server!.once("listening", resolve));
   const { port } = server.address() as AddressInfo;
 
-  return fetch(`http://127.0.0.1:${port}/v1/sentinel/check`, {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -67,7 +75,7 @@ describe("POST /v1/sentinel/check", () => {
   it("returns an evidence-backed verdict and seal in development", async () => {
     process.env.NODE_ENV = "test";
     process.env.PAYMENTS_ENABLED = "false";
-    const response = await postCheck(validRequest);
+    const response = await post("/v1/sentinel/check", validRequest);
     const body = (await response.json()) as {
       verdict: { verdict: string };
       seal: { network: string; decisionDigest: string };
@@ -82,7 +90,10 @@ describe("POST /v1/sentinel/check", () => {
   it("rejects malformed transaction intents", async () => {
     process.env.NODE_ENV = "test";
     process.env.PAYMENTS_ENABLED = "false";
-    const response = await postCheck({ ...validRequest, intent: { chainId: 1 } });
+    const response = await post("/v1/sentinel/check", {
+      ...validRequest,
+      intent: { chainId: 1 },
+    });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
@@ -93,11 +104,25 @@ describe("POST /v1/sentinel/check", () => {
   it("keeps the route closed in production until payment is mounted", async () => {
     process.env.NODE_ENV = "production";
     process.env.PAYMENTS_ENABLED = "false";
-    const response = await postCheck(validRequest);
+    const response = await post("/v1/sentinel/check", validRequest);
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       error: "PAID_ROUTE_NOT_CONFIGURED",
+    });
+  });
+});
+
+describe("POST /v1/pulse/inspect", () => {
+  it("returns evidence collected by the server", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.PAYMENTS_ENABLED = "false";
+    const response = await post("/v1/pulse/inspect", validRequest);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      blockNumber: "123",
+      signals: { simulationSucceeded: true },
     });
   });
 });

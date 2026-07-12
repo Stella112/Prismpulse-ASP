@@ -67,5 +67,29 @@ describe("evaluateTransaction", () => {
     expect(verdict.verdict).toBe("ALLOW");
     expect(verdict.score).toBe(0);
   });
-});
 
+  it("warns when Hive signature scanning is unavailable", () => {
+    const verdict = evaluateTransaction(
+      intent,
+      {
+        simulationSucceeded: true,
+        approvalIsUnlimited: false,
+      },
+      [
+        {
+          id: "simulation-2",
+          kind: "simulation",
+          source: "https://rpc.xlayer.tech",
+          observedAt: new Date().toISOString(),
+          value: { success: true },
+          confidence: 1,
+          verified: true,
+          stale: false,
+        },
+      ],
+    );
+
+    expect(verdict.verdict).toBe("WARN");
+    expect(verdict.reasonCodes).toContain("SIGNATURE_SCAN_UNAVAILABLE");
+  });
+});
