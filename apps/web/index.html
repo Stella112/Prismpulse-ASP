@@ -59,7 +59,7 @@
             <div><span>Network</span><strong>eip155:196</strong></div>
             <div><span>Evidence source</span><strong id="rpc-label">X Layer RPC</strong></div>
             <div><span>Payment rail</span><strong id="payment-state">Checking</strong></div>
-            <div><span>Seal registry</span><strong>Awaiting deploy</strong></div>
+            <div><span>Seal registry</span><strong id="registry-state">Checking</strong></div>
           </div>
 
           <div class="workspace-grid">
@@ -150,7 +150,12 @@
               <div class="panel-heading"><div><p class="section-label">RECEIPT</p><h2>Seal details</h2></div></div>
               <div class="empty-state compact" id="seal-empty"><strong>No receipt loaded</strong></div>
               <div id="seal-result" hidden>
+                <div class="seal-toolbar">
+                  <span class="result-state idle" id="anchor-state">Checking anchor</span>
+                  <button class="secondary-action" id="copy-seal-link" type="button">Copy share link</button>
+                </div>
                 <dl class="seal-details" id="seal-details"></dl>
+                <p class="explorer-help" id="anchor-detail"></p>
                 <div class="evidence-heading"><span>Decision evidence</span><span id="seal-evidence-count"></span></div>
                 <div class="evidence-list" id="seal-evidence-list"></div>
               </div>
@@ -174,7 +179,7 @@
             <div class="table-head"><span>Service</span><span>Status</span><span>Endpoint</span></div>
             <div class="table-row"><strong>Sentinel API</strong><span id="system-api">Checking</span><span>api.getprismpulse.xyz</span></div>
             <div class="table-row"><strong>X Layer RPC</strong><span>Configured</span><span>rpc.xlayer.tech</span></div>
-            <div class="table-row"><strong>Seal Registry</strong><span class="state-warning">Not deployed</span><span>Mainnet pending</span></div>
+            <div class="table-row"><strong>Seal Registry</strong><span class="state-warning" id="system-registry">Checking</span><span id="system-registry-endpoint">Mainnet boundary</span></div>
             <div class="table-row"><strong>OKX Payments</strong><span id="system-payments">Checking</span><span>Exact / X Layer</span></div>
           </div>
         </section>

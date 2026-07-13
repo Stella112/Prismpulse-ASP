@@ -26,7 +26,9 @@ EVIDENCE_SEAL_DIR=/app/data/seals
 XLAYER_NETWORK=eip155:196
 XLAYER_RPC_URL=https://rpc.xlayer.tech
 RECEIPT_ANCHOR_ADDRESS=
+XLAYER_EXPLORER_URL=https://www.oklink.com/x-layer
 COVERAGE_POOL_ADDRESS=
+CONSOLE_ISSUANCE_ENABLED=true
 PAYMENTS_ENABLED=false
 OKX_API_KEY=
 OKX_SECRET_KEY=
@@ -41,9 +43,18 @@ EOF
   chmod 0600 .env
 fi
 
+if ! grep -q '^CONSOLE_ISSUANCE_ENABLED=' .env; then
+  printf '\nCONSOLE_ISSUANCE_ENABLED=true\n' >>.env
+fi
+if ! grep -q '^XLAYER_EXPLORER_URL=' .env; then
+  printf 'XLAYER_EXPLORER_URL=https://www.oklink.com/x-layer\n' >>.env
+fi
+
 docker compose config --quiet
 docker compose build --pull
 docker compose up -d --remove-orphans
 docker compose ps
+
+SMOKE_BASE_URL=${SMOKE_BASE_URL:-https://getprismpulse.xyz} SMOKE_ISSUE_SEAL=true pnpm smoke:production
 
 echo "PrismPulse deployment completed at $(git rev-parse --short HEAD)."

@@ -41,6 +41,7 @@ const inspection: PulseInspection = {
 let server: Server | undefined;
 const originalNodeEnv = process.env.NODE_ENV;
 const originalPaymentsEnabled = process.env.PAYMENTS_ENABLED;
+const originalConsoleIssuanceEnabled = process.env.CONSOLE_ISSUANCE_ENABLED;
 
 afterEach(() => {
   server?.close();
@@ -54,6 +55,11 @@ afterEach(() => {
     delete process.env.PAYMENTS_ENABLED;
   } else {
     process.env.PAYMENTS_ENABLED = originalPaymentsEnabled;
+  }
+  if (originalConsoleIssuanceEnabled === undefined) {
+    delete process.env.CONSOLE_ISSUANCE_ENABLED;
+  } else {
+    process.env.CONSOLE_ISSUANCE_ENABLED = originalConsoleIssuanceEnabled;
   }
 });
 
@@ -149,11 +155,12 @@ describe("Evidence Seal persistence and retrieval", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toContain("immutable");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=30");
     await expect(response.json()).resolves.toMatchObject({
       seal: { decisionDigest: issuedBody.seal.decisionDigest, verdict: "ALLOW" },
       verdict: { verdict: "ALLOW" },
       intent: validRequest.intent,
+      anchoring: { state: "NOT_CONFIGURED" },
     });
   });
 
@@ -178,6 +185,36 @@ describe("Evidence Seal persistence and retrieval", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       error: "SEAL_PERSISTENCE_FAILED",
+    });
+  });
+});
+
+describe("POST /v1/console/seals", () => {
+  it("issues a persisted, shareable Seal from the console", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.PAYMENTS_ENABLED = "false";
+    process.env.CONSOLE_ISSUANCE_ENABLED = "true";
+    const store = new MemoryEvidenceSealStore();
+    const response = await post("/v1/console/seals", validRequest, store);
+    const body = (await response.json()) as {
+      seal: { decisionDigest: string };
+      anchoring: { state: string };
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.seal.decisionDigest).toMatch(/^0x[a-f0-9]{64}$/);
+    expect(body.anchoring.state).toBe("NOT_CONFIGURED");
+    await expect(store.findByDecisionDigest(body.seal.decisionDigest)).resolves.not.toBeNull();
+  });
+
+  it("fails closed in production unless explicitly enabled", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.PAYMENTS_ENABLED = "false";
+    delete process.env.CONSOLE_ISSUANCE_ENABLED;
+    const response = await post("/v1/console/seals", validRequest);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "CONSOLE_ISSUANCE_DISABLED",
     });
   });
 });

@@ -629,6 +629,26 @@ textarea::placeholder {
   margin: 0;
 }
 
+.seal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.seal-toolbar .secondary-action {
+  min-height: 31px;
+}
+
+.explorer-help a {
+  color: var(--cyan);
+}
+
+.state-success {
+  color: var(--green);
+}
+
 .seal-details > div {
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);

@@ -6,6 +6,7 @@ import { digestSchema, transactionIntentSchema } from "@prismpulse/schemas";
 import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
+import { createSealRegistry, type SealRegistry } from "./registry.js";
 import {
   createEvidenceSealStore,
   type EvidenceSealStore,
@@ -23,6 +24,7 @@ const checkRequestSchema = z.object({
 export interface AppOptions {
   collectEvidence?: (intent: TransactionIntent) => Promise<PulseInspection>;
   sealStore?: EvidenceSealStore;
+  sealRegistry?: SealRegistry;
 }
 
 function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
@@ -59,6 +61,9 @@ export function createApp(options: AppOptions = {}): Express {
   const paymentGate = createPaymentGate(process.env);
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
   const sealStore = options.sealStore ?? createEvidenceSealStore(process.env);
+  const sealRegistry = options.sealRegistry ?? createSealRegistry(process.env);
+  const consoleIssuanceEnabled =
+    process.env.NODE_ENV !== "production" || process.env.CONSOLE_ISSUANCE_ENABLED === "true";
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(helmet());
@@ -78,7 +83,19 @@ export function createApp(options: AppOptions = {}): Express {
       version: "0.1.0",
       network: "eip155:196",
       paidRoutesEnabled: paymentGate.enabled,
-      capabilities: ["pulse-inspection", "sentinel-check", "evidence-receipts"],
+      consoleIssuanceEnabled,
+      registry: {
+        configured: sealRegistry.configured,
+        address: sealRegistry.address,
+        explorerUrl: sealRegistry.explorerUrl,
+      },
+      capabilities: [
+        "pulse-inspection",
+        "sentinel-check",
+        "console-seal-issuance",
+        "evidence-receipts",
+        "registry-status",
+      ],
     });
   });
 
@@ -98,8 +115,11 @@ export function createApp(options: AppOptions = {}): Express {
         response.status(404).json({ error: "SEAL_NOT_FOUND" });
         return;
       }
-      response.setHeader("Cache-Control", "public, max-age=60, immutable");
-      response.json(record);
+      response.setHeader("Cache-Control", "public, max-age=30");
+      response.json({
+        ...record,
+        anchoring: await sealRegistry.getStatus(record.seal.decisionDigest),
+      });
     } catch {
       response.status(503).json({
         error: "SEAL_STORE_UNAVAILABLE",
@@ -131,6 +151,47 @@ export function createApp(options: AppOptions = {}): Express {
     }
   });
 
+  async function issueSeal(intent: TransactionIntent) {
+    const inspection = await collectEvidence(intent);
+    const verdict = evaluateTransaction(intent, inspection.signals, inspection.evidence);
+    const seal = createEvidenceSeal(intent, verdict);
+    const record = { verdict, seal, intent, storedAt: new Date().toISOString() };
+    await sealStore.save(record);
+    const anchoring = await sealRegistry.requestAnchor(seal.decisionDigest);
+    return { ...record, anchoring };
+  }
+
+  app.post(
+    "/v1/console/seals",
+    createPulseRateLimit(5),
+    async (request, response) => {
+      if (!consoleIssuanceEnabled) {
+        response.status(503).json({
+          error: "CONSOLE_ISSUANCE_DISABLED",
+          message: "Console Seal issuance is disabled for this deployment.",
+        });
+        return;
+      }
+      const parsed = checkRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json({ error: "INVALID_REQUEST", details: parsed.error.flatten() });
+        return;
+      }
+      try {
+        response.status(201).json(await issueSeal(parsed.data.intent));
+      } catch (error) {
+        if (error instanceof EvidenceUnavailableError) {
+          response.status(502).json({ error: "EVIDENCE_UNAVAILABLE", message: error.message });
+          return;
+        }
+        response.status(503).json({
+          error: "SEAL_ISSUANCE_FAILED",
+          message: "The Seal could not be issued and persisted.",
+        });
+      }
+    },
+  );
+
   app.post("/v1/sentinel/check", async (request, response) => {
     if (process.env.NODE_ENV === "production" && !paymentGate.enabled) {
       response.status(503).json({
@@ -150,37 +211,15 @@ export function createApp(options: AppOptions = {}): Express {
     }
 
     try {
-      const inspection = await collectEvidence(parsed.data.intent);
-      const verdict = evaluateTransaction(
-        parsed.data.intent,
-        inspection.signals,
-        inspection.evidence,
-      );
-
-      const seal = createEvidenceSeal(parsed.data.intent, verdict);
-      const record = {
-        verdict,
-        seal,
-        intent: parsed.data.intent,
-        storedAt: new Date().toISOString(),
-      };
-      try {
-        await sealStore.save(record);
-      } catch {
-        response.status(503).json({
-          error: "SEAL_PERSISTENCE_FAILED",
-          message: "The verdict was not issued because its Evidence Seal could not be persisted.",
-        });
+      response.status(201).json(await issueSeal(parsed.data.intent));
+    } catch (error) {
+      if (error instanceof EvidenceUnavailableError) {
+        response.status(502).json({ error: "EVIDENCE_UNAVAILABLE", message: error.message });
         return;
       }
-      response.status(201).json(record);
-    } catch (error) {
-      response.status(502).json({
-        error: "EVIDENCE_UNAVAILABLE",
-        message:
-          error instanceof EvidenceUnavailableError
-            ? error.message
-            : "X Layer evidence collection failed.",
+      response.status(503).json({
+        error: "SEAL_PERSISTENCE_FAILED",
+        message: "The verdict was not issued because its Evidence Seal could not be persisted.",
       });
     }
   });

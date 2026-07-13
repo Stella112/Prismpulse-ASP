@@ -18,6 +18,9 @@ const paymentState = document.querySelector("#payment-state");
 const systemPayments = document.querySelector("#system-payments");
 const sealButton = document.querySelector("#seal-button");
 const sealNote = document.querySelector("#seal-note");
+let consoleIssuanceEnabled = false;
+let lastInspectedIntent;
+let currentSealDigest;
 
 function setServiceState(live, label) {
   for (const dot of [apiDot, sidebarStatus]) {
@@ -39,9 +42,18 @@ async function loadMetadata() {
     const paymentLabel = metadata.paidRoutesEnabled ? "Exact active" : "Setup pending";
     paymentState.textContent = paymentLabel;
     systemPayments.textContent = paymentLabel;
-    if (metadata.paidRoutesEnabled) {
-      sealNote.textContent = "Available to x402-compatible agents.";
-    }
+    consoleIssuanceEnabled = Boolean(metadata.consoleIssuanceEnabled);
+    const registryLabel = metadata.registry?.configured ? "Connected" : "Not configured";
+    document.querySelector("#registry-state").textContent = registryLabel;
+    document.querySelector("#system-registry").textContent = registryLabel;
+    document.querySelector("#system-registry").className = metadata.registry?.configured
+      ? "state-success"
+      : "state-warning";
+    document.querySelector("#system-registry-endpoint").textContent =
+      metadata.registry?.address ?? "Issuer boundary idle";
+    sealNote.textContent = consoleIssuanceEnabled
+      ? "Ready to persist an Evidence Seal."
+      : "Console issuance is disabled; use the paid agent endpoint.";
   } catch {
     setServiceState(false, "API unavailable");
     paymentState.textContent = "Unknown";
@@ -186,6 +198,8 @@ document.querySelector("#inspection-form").addEventListener("submit", async (eve
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message ?? `Inspection failed (${response.status}).`);
     renderInspection(payload);
+    lastInspectedIntent = intent;
+    sealButton.disabled = !consoleIssuanceEnabled;
   } catch (inspectionError) {
     error.textContent = inspectionError.message;
     const state = document.querySelector("#result-state");
@@ -204,6 +218,8 @@ document.querySelector("#clear-button").addEventListener("click", () => {
   document.querySelector("#form-error").textContent = "";
   document.querySelector("#empty-result").hidden = false;
   document.querySelector("#result-content").hidden = true;
+  lastInspectedIntent = undefined;
+  sealButton.disabled = true;
   const state = document.querySelector("#result-state");
   state.textContent = "Idle";
   state.className = "result-state idle";
@@ -220,6 +236,51 @@ function sealRows(seal) {
     ["Evidence digest", seal.evidenceDigest],
     ["Decision digest", seal.decisionDigest],
   ];
+}
+
+function renderSealRecord(payload) {
+  const { seal, verdict, storedAt, anchoring = { state: "NOT_CONFIGURED" } } = payload;
+  currentSealDigest = seal.decisionDigest;
+  const details = document.querySelector("#seal-details");
+  details.replaceChildren(
+    ...[...sealRows(seal), ["Score", `${verdict.score} / 100`], ["Stored", storedAt]].map(([label, value]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const description = document.createElement("dd");
+      term.textContent = label;
+      description.textContent = value;
+      row.append(term, description);
+      return row;
+    }),
+  );
+  const anchorState = document.querySelector("#anchor-state");
+  const anchorLabels = {
+    ANCHORED: "Anchored on X Layer",
+    PENDING: "Anchor pending",
+    FAILED: "Anchor check failed",
+    NOT_CONFIGURED: "Offchain Seal",
+  };
+  anchorState.textContent = anchorLabels[anchoring.state] ?? anchoring.state;
+  anchorState.className = `result-state ${anchoring.state === "ANCHORED" ? "success" : anchoring.state === "FAILED" ? "danger" : "idle"}`;
+  const anchorDetail = document.querySelector("#anchor-detail");
+  anchorDetail.replaceChildren();
+  if (anchoring.explorerUrl) {
+    const link = document.createElement("a");
+    link.href = anchoring.explorerUrl;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = anchoring.state === "ANCHORED" ? "View registry on X Layer Explorer" : "View configured registry";
+    anchorDetail.append(link);
+  } else {
+    anchorDetail.textContent = "The evidence receipt is persisted offchain; no registry is configured.";
+  }
+  const evidence = Array.isArray(verdict.evidence) ? verdict.evidence : [];
+  document.querySelector("#seal-evidence-list").replaceChildren(...evidence.map(evidenceItem));
+  document.querySelector("#seal-evidence-count").textContent = `${evidence.length} claim${evidence.length === 1 ? "" : "s"}`;
+  document.querySelector("#seal-empty").hidden = true;
+  document.querySelector("#seal-result").hidden = false;
+  document.querySelector("#seal-digest").value = seal.decisionDigest;
+  window.history.replaceState(null, "", `#seals/${seal.decisionDigest}`);
 }
 
 document.querySelector("#seal-form").addEventListener("submit", async (event) => {
@@ -246,28 +307,7 @@ document.querySelector("#seal-form").addEventListener("submit", async (event) =>
           : payload.message ?? `Seal lookup failed (${response.status}).`,
       );
     }
-    const { seal, verdict, storedAt } = payload;
-
-    const details = document.querySelector("#seal-details");
-    details.replaceChildren(
-      ...[...sealRows(seal), ["Score", `${verdict.score} / 100`], ["Stored", storedAt]].map(([label, value]) => {
-        const row = document.createElement("div");
-        const term = document.createElement("dt");
-        const description = document.createElement("dd");
-        term.textContent = label;
-        description.textContent = value;
-        row.append(term, description);
-        return row;
-      }),
-    );
-    const evidence = Array.isArray(verdict.evidence) ? verdict.evidence : [];
-    document.querySelector("#seal-evidence-list").replaceChildren(
-      ...evidence.map(evidenceItem),
-    );
-    document.querySelector("#seal-evidence-count").textContent = `${evidence.length} claim${evidence.length === 1 ? "" : "s"}`;
-    document.querySelector("#seal-empty").hidden = true;
-    document.querySelector("#seal-result").hidden = false;
-    window.history.replaceState(null, "", `#seals/${digest}`);
+    renderSealRecord(payload);
   } catch (sealError) {
     error.textContent = sealError.message;
   } finally {
@@ -284,7 +324,39 @@ if (hashSealDigest) {
 }
 
 sealButton.addEventListener("click", () => {
-  sealNote.textContent = "Use the paid A2MCP endpoint from an x402-compatible agent.";
+  if (!lastInspectedIntent || !consoleIssuanceEnabled) return;
+  sealButton.disabled = true;
+  sealButton.textContent = "Issuing Seal";
+  sealNote.textContent = "Rechecking evidence and persisting the decision.";
+  fetch(`${API_BASE}/v1/console/seals`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ intent: lastInspectedIntent }),
+  })
+    .then(async (response) => {
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message ?? `Seal issuance failed (${response.status}).`);
+      renderSealRecord(payload);
+      switchView("seals");
+    })
+    .catch((error) => {
+      sealNote.textContent = error.message;
+    })
+    .finally(() => {
+      sealButton.disabled = false;
+      sealButton.textContent = "Underwrite and Seal";
+    });
+});
+
+document.querySelector("#copy-seal-link").addEventListener("click", async (event) => {
+  if (!currentSealDigest) return;
+  const shareUrl = `${window.location.origin}${window.location.pathname}#seals/${currentSealDigest}`;
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    event.currentTarget.textContent = "Link copied";
+  } catch {
+    window.prompt("Copy this Seal link", shareUrl);
+  }
 });
 
 loadMetadata();
