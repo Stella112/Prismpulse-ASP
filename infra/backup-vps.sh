@@ -18,7 +18,7 @@ docker run --rm \
   -v "${project}_evidence_seals:/source:ro" \
   -v "${temporary}:/backup" \
   alpine:3.21 tar -C /source -czf /backup/evidence-seals.tar.gz .
-sha256sum "${temporary}"/* >"${temporary}/SHA256SUMS"
+(cd "${temporary}" && sha256sum postgres.sql.gz evidence-seals.tar.gz >SHA256SUMS)
 mv "${temporary}" "${destination}"
 find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
 
