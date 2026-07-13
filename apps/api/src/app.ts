@@ -1,11 +1,13 @@
 import cors from "cors";
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
-import { createEvidenceSeal, evaluateTransaction } from "@prismpulse/core";
+import { createEvidenceSeal, evaluateTransaction, inspectPayloadText, type PayloadInspectionStatus } from "@prismpulse/core";
 import { digestSchema, transactionIntentSchema } from "@prismpulse/schemas";
 import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
+import { createHiveStore, type HiveStore } from "./hive.js";
+import { createLocalReasoner, type LocalReasoner } from "./reasoner.js";
 import { createSealRegistry, type SealRegistry } from "./registry.js";
 import {
   createEvidenceSealStore,
@@ -21,10 +23,17 @@ const checkRequestSchema = z.object({
   intent: transactionIntentSchema,
 });
 
+const hiveCaptureSchema = z.object({
+  payload: z.string().min(3).max(20_000),
+  source: z.string().min(3).max(200),
+});
+
 export interface AppOptions {
   collectEvidence?: (intent: TransactionIntent) => Promise<PulseInspection>;
   sealStore?: EvidenceSealStore;
   sealRegistry?: SealRegistry;
+  hiveStore?: HiveStore;
+  reasoner?: LocalReasoner;
 }
 
 function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
@@ -62,6 +71,10 @@ export function createApp(options: AppOptions = {}): Express {
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
   const sealStore = options.sealStore ?? createEvidenceSealStore(process.env);
   const sealRegistry = options.sealRegistry ?? createSealRegistry(process.env);
+  const hiveStorePromise = options.hiveStore ? Promise.resolve(options.hiveStore) : createHiveStore(process.env);
+  const reasoner = options.reasoner ?? (process.env.NODE_ENV === "test"
+    ? { inspectPayload: async () => ({ status: "PASS", confidence: 1, reasons: [] }), ready: async () => true }
+    : createLocalReasoner(process.env));
   const consoleIssuanceEnabled =
     process.env.NODE_ENV !== "production" || process.env.CONSOLE_ISSUANCE_ENABLED === "true";
   app.disable("x-powered-by");
@@ -77,10 +90,16 @@ export function createApp(options: AppOptions = {}): Express {
     response.json({ status: "ok", service: "prismpulse-api" });
   });
 
-  app.get("/v1/readiness", (_request, response) => {
+  app.get("/v1/readiness", async (_request, response) => {
     const registryReady = sealRegistry.configured && sealRegistry.workerEnabled;
     const paymentsReady = paymentGate.enabled;
-    const launchReady = registryReady && paymentsReady;
+    const localReasoningReady = await reasoner.ready();
+    let hiveReady = false;
+    try {
+      await (await hiveStorePromise).list();
+      hiveReady = true;
+    } catch {}
+    const launchReady = registryReady && paymentsReady && localReasoningReady && hiveReady;
     response.status(launchReady ? 200 : 503).json({
       status: launchReady ? "READY" : "NOT_READY",
       operational: true,
@@ -89,11 +108,15 @@ export function createApp(options: AppOptions = {}): Express {
         api: "READY",
         registry: registryReady ? "READY" : "NOT_READY",
         payments: paymentsReady ? "READY" : "NOT_READY",
+        localReasoning: localReasoningReady ? "READY" : "NOT_READY",
+        hive: hiveReady ? "READY" : "NOT_READY",
         consoleIssuance: consoleIssuanceEnabled ? "READY" : "DISABLED",
       },
       actions: [
         ...(!registryReady ? ["Configure the X Layer registry issuer worker."] : []),
         ...(!paymentsReady ? ["Configure and enable OKX seller payments."] : []),
+        ...(!localReasoningReady ? ["Start the pinned local Llama model."] : []),
+        ...(!hiveReady ? ["Restore the passive Hive signature store."] : []),
       ],
     });
   });
@@ -118,6 +141,9 @@ export function createApp(options: AppOptions = {}): Express {
         "evidence-receipts",
         "registry-status",
         "launch-readiness",
+        "five-check-sentinel",
+        "passive-hive-immunization",
+        "local-llama-reasoning",
       ],
     });
   });
@@ -176,7 +202,62 @@ export function createApp(options: AppOptions = {}): Express {
 
   async function issueSeal(intent: TransactionIntent) {
     const inspection = await collectEvidence(intent);
-    const verdict = evaluateTransaction(intent, inspection.signals, inspection.evidence);
+    const payload = intent.payloadText ?? intent.declaredPurpose;
+    const deterministicInspection = inspectPayloadText(payload);
+    const modelInspection = await reasoner.inspectPayload(payload);
+    const hive = await (await hiveStorePromise).inspect(payload, [intent.to]);
+    const payloadStatus: PayloadInspectionStatus = deterministicInspection.status === "BLOCK" || modelInspection.status === "BLOCK"
+      ? "BLOCK"
+      : deterministicInspection.status === "UNKNOWN" || modelInspection.status === "UNKNOWN" ? "UNKNOWN" : "PASS";
+    const amountUsd = intent.transactionAmountUsd ?? (intent.value === "0" ? 0 : undefined);
+    const evidence = inspection.evidence.filter((claim) => !claim.id.startsWith("signature-scan-")).concat([
+      {
+        id: "hive-scan-" + inspection.blockNumber,
+        kind: "signature" as const,
+        source: (process.env.PUBLIC_BASE_URL ?? "https://api.getprismpulse.xyz") + "/v1/hive/signatures",
+        observedAt: new Date().toISOString(),
+        blockNumber: inspection.blockNumber,
+        value: hive,
+        confidence: 1,
+        verified: true,
+        stale: false,
+      },
+      {
+        id: "llama-inspection-" + inspection.blockNumber,
+        kind: "policy" as const,
+        source: process.env.OLLAMA_BASE_URL ?? "http://ollama:11434",
+        observedAt: new Date().toISOString(),
+        blockNumber: inspection.blockNumber,
+        value: modelInspection,
+        confidence: modelInspection.confidence,
+        verified: modelInspection.status !== "UNKNOWN",
+        stale: false,
+      },
+    ]);
+    const signals = {
+      ...inspection.signals,
+      payloadInspection: {
+        status: payloadStatus,
+        confidence: Math.min(deterministicInspection.confidence, modelInspection.confidence),
+      },
+      effectRecipientMatches: intent.expectedRecipient ? intent.expectedRecipient.toLowerCase() === intent.to.toLowerCase() : true,
+      knownAttackSignature: hive.matched,
+      counterpartyAnomalyScore: hive.anomalyScore,
+      counterparty: {
+        identityResolved: false,
+        highValue: amountUsd === undefined || amountUsd >= Number(process.env.SENTINEL_HIGH_VALUE_USD ?? 100),
+        knownVendorAddressChanged: false,
+      },
+      spendPolicy: amountUsd === undefined ? undefined : {
+        killSwitchActive: process.env.GLOBAL_KILL_SWITCH === "true",
+        drainDetected: false,
+        amountUsd,
+        rollingDailySpendUsd: Number(process.env.ROLLING_DAILY_SPEND_USD ?? 0),
+        perTransactionCapUsd: Number(process.env.PER_TRANSACTION_CAP_USD ?? 100),
+        dailyCapUsd: Number(process.env.DAILY_CAP_USD ?? 500),
+      },
+    };
+    const verdict = evaluateTransaction(intent, signals, evidence);
     const seal = createEvidenceSeal(intent, verdict);
     const record = { verdict, seal, intent, storedAt: new Date().toISOString() };
     await sealStore.save(record);
@@ -245,6 +326,33 @@ export function createApp(options: AppOptions = {}): Express {
         message: "The verdict was not issued because its Evidence Seal could not be persisted.",
       });
     }
+  });
+
+  app.post("/v1/hive/captures", async (request, response) => {
+    const captureToken = process.env.HIVE_CAPTURE_TOKEN;
+    if (process.env.NODE_ENV === "production" && !captureToken) {
+      response.status(503).json({ error: "HIVE_CAPTURE_DISABLED" });
+      return;
+    }
+    if (captureToken && request.headers.authorization !== "Bearer " + captureToken) {
+      response.status(401).json({ error: "HIVE_CAPTURE_UNAUTHORIZED" });
+      return;
+    }
+    const parsed = hiveCaptureSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "INVALID_REQUEST", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const signature = await (await hiveStorePromise).capture(parsed.data.payload, parsed.data.source);
+      response.status(201).json({ signature, propagated: true });
+    } catch (error) {
+      response.status(422).json({ error: "CAPTURE_REJECTED", message: error instanceof Error ? error.message : "Hive capture rejected." });
+    }
+  });
+
+  app.get("/v1/hive/signatures", async (_request, response) => {
+    response.json({ signatures: await (await hiveStorePromise).list() });
   });
 
   return app;

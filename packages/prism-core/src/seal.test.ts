@@ -15,6 +15,44 @@ const verdict: SentinelVerdict = {
   verdict: "ALLOW",
   score: 0,
   reasonCodes: [],
+  perCheck: [
+  {
+    "check": "PAYLOAD_INSPECTION",
+    "status": "PASS",
+    "confidence": 1,
+    "reasons": [],
+    "summary": "Passed."
+  },
+  {
+    "check": "COUNTERPARTY_VERIFICATION",
+    "status": "PASS",
+    "confidence": 1,
+    "reasons": [],
+    "summary": "Passed."
+  },
+  {
+    "check": "TRANSACTION_INTENT_GUARD",
+    "status": "PASS",
+    "confidence": 1,
+    "reasons": [],
+    "summary": "Passed."
+  },
+  {
+    "check": "COUNTERPARTY_ANOMALY",
+    "status": "PASS",
+    "confidence": 1,
+    "reasons": [],
+    "summary": "Passed."
+  },
+  {
+    "check": "SPEND_CIRCUIT_BREAKER",
+    "status": "PASS",
+    "confidence": 1,
+    "reasons": [],
+    "summary": "Passed."
+  }
+],
+  confidence: 1,
   summary: "No active policy violations were found in the supplied evidence.",
   evidence: [
     {

@@ -8,11 +8,40 @@ services:
     environment:
       NODE_OPTIONS: --max-old-space-size=512
       EVIDENCE_SEAL_DIR: /app/data/seals
+      HIVE_STORE_FILE: /app/data/seals/hive-signatures.json
+      OLLAMA_BASE_URL: http://ollama:11434
     volumes:
       - evidence_seals:/app/data/seals
     depends_on:
-      postgres:
+      ollama:
+    image: ollama/ollama:0.30.8
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 3g
+
+  ollama-init:
+    image: ollama/ollama:0.30.8
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "llama3.2:1b"]
+    depends_on:
+      ollama:
         condition: service_healthy
+    volumes:
+      - ollama_models:/root/.ollama
+    mem_limit: 512m
+
+  postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -61,5 +90,6 @@ services:
 volumes:
   postgres_data:
   evidence_seals:
+  ollama_models:
   caddy_data:
   caddy_config:
