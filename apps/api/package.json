@@ -12,7 +12,9 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "registry:simulate": "node scripts/registry-deployment.mjs simulate",
     "registry:deploy": "node scripts/registry-deployment.mjs deploy",
-    "registry:confirm": "node scripts/registry-deployment.mjs confirm"
+    "registry:confirm": "node scripts/registry-deployment.mjs confirm",
+    "bond:deploy": "node scripts/bond-deployment.mjs deploy",
+    "bond:confirm": "node scripts/bond-deployment.mjs confirm"
   },
   "dependencies": {
     "@okxweb3/x402-core": "0.1.0",
