@@ -1,5 +1,7 @@
 const baseUrl = (process.env.SMOKE_BASE_URL ?? "https://getprismpulse.xyz").replace(/\/$/, "");
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS ?? 15_000);
+const requireRegistry = process.env.SMOKE_REQUIRE_REGISTRY === "true";
+const anchorTimeoutMs = Number(process.env.SMOKE_ANCHOR_TIMEOUT_MS ?? 120_000);
 
 async function checked(path, options) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -18,6 +20,12 @@ if (health.status !== "ok") throw new Error("API health payload is not ok");
 const metadata = await (await checked("/api/v1/metadata")).json();
 for (const capability of ["console-seal-issuance", "evidence-receipts", "registry-status"]) {
   if (!metadata.capabilities?.includes(capability)) throw new Error(`Missing capability: ${capability}`);
+}
+if (requireRegistry && !metadata.registry?.configured) {
+  throw new Error("Seal registry is not configured");
+}
+if (requireRegistry && !metadata.registry?.workerEnabled) {
+  throw new Error("Seal registry issuer worker is not enabled");
 }
 
 const consolePage = await (await checked("/")).text();
@@ -44,11 +52,29 @@ if (process.env.SMOKE_ISSUE_SEAL === "true") {
   if (!/^0x[a-f0-9]{64}$/.test(issued.seal?.decisionDigest)) {
     throw new Error("Issued Seal has no valid decision digest");
   }
-  const retrieved = await (
-    await checked(`/api/v1/seals/${issued.seal.decisionDigest}`)
-  ).json();
+  const sealPath = `/api/v1/seals/${issued.seal.decisionDigest}`;
+  let retrieved = await (await checked(sealPath)).json();
   if (retrieved.seal?.decisionDigest !== issued.seal.decisionDigest) {
     throw new Error("Issued Seal was not retrievable");
+  }
+
+  if (requireRegistry) {
+    const deadline = Date.now() + anchorTimeoutMs;
+    while (retrieved.anchoring?.state !== "ANCHORED" && Date.now() < deadline) {
+      if (retrieved.anchoring?.state === "FAILED") {
+        throw new Error(
+          `Seal anchoring failed: ${retrieved.anchoring.message ?? "unknown error"}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      retrieved = await (await checked(sealPath)).json();
+    }
+    if (retrieved.anchoring?.state !== "ANCHORED") {
+      throw new Error(`Seal was not anchored within ${anchorTimeoutMs}ms`);
+    }
+    console.log(
+      `Confirmed anchored Seal ${issued.seal.decisionDigest} at ${retrieved.anchoring.explorerUrl}`,
+    );
   }
 }
 

@@ -39,9 +39,26 @@ Copy `.env.example` to `.env` locally and provide secrets through the deployment
 - Evidence and transaction details remain offchain; only the canonical decision digest is anchored.
 - API responses expose `NOT_CONFIGURED`, `PENDING`, `ANCHORED`, or `FAILED` anchoring state. The `SealRegistry` boundary intentionally leaves transaction signing to a separately funded issuer worker.
 
+## Registry deployment
+
+Build 4 includes guarded X Layer mainnet tooling:
+
+```bash
+pnpm registry:simulate
+pnpm registry:deploy
+pnpm registry:confirm
+```
+
+Simulation accepts `REGISTRY_DEPLOYER_ADDRESS`; deployment requires
+`REGISTRY_DEPLOYER_PRIVATE_KEY`, with optional owner and issuer address separation. Confirmation reads
+`RECEIPT_ANCHOR_ADDRESS` and verifies deployed bytecode, ownership, and issuer authorization.
+The API worker uses `ANCHOR_ISSUER_PRIVATE_KEY`; it stores retryable queue state beneath
+`ANCHOR_JOB_DIR`. Private keys are consumed from the environment and are never printed.
+
+
 ## Production smoke
 
-`pnpm smoke:production` checks the live console, API health, metadata, and Build 3 capabilities. Set `SMOKE_ISSUE_SEAL=true` to additionally issue and retrieve a real production Seal; the VPS deployment runs this end-to-end mode after every release.
+`pnpm smoke:production` checks the live console, API health, metadata, and Build 4 capabilities. Set `SMOKE_ISSUE_SEAL=true` to issue and retrieve a real production Seal. Add `SMOKE_REQUIRE_REGISTRY=true` to require an enabled issuer worker and wait for on-chain confirmation; the VPS deployment runs the issuance smoke after every release.
 
 ## Mainnet policy
 

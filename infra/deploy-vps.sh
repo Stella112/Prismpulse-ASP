@@ -27,6 +27,9 @@ XLAYER_NETWORK=eip155:196
 XLAYER_RPC_URL=https://rpc.xlayer.tech
 RECEIPT_ANCHOR_ADDRESS=
 XLAYER_EXPLORER_URL=https://www.oklink.com/x-layer
+ANCHOR_JOB_DIR=/app/data/seals/anchors
+ANCHOR_ISSUER_PRIVATE_KEY=
+ANCHOR_WORKER_INTERVAL_MS=5000
 COVERAGE_POOL_ADDRESS=
 CONSOLE_ISSUANCE_ENABLED=true
 PAYMENTS_ENABLED=false
@@ -50,8 +53,20 @@ if ! grep -q '^XLAYER_EXPLORER_URL=' .env; then
   printf 'XLAYER_EXPLORER_URL=https://www.oklink.com/x-layer\n' >>.env
 fi
 
-docker compose config --quiet
+if ! grep -q '^RECEIPT_ANCHOR_ADDRESS=' .env; then
+  printf 'RECEIPT_ANCHOR_ADDRESS=\n' >>.env
+fi
+if ! grep -q '^ANCHOR_ISSUER_PRIVATE_KEY=' .env; then
+  printf 'ANCHOR_ISSUER_PRIVATE_KEY=\n' >>.env
+fi
+if ! grep -q '^ANCHOR_JOB_DIR=' .env; then
+  printf 'ANCHOR_JOB_DIR=/app/data/seals/anchors\n' >>.env
+fi
+if ! grep -q '^ANCHOR_WORKER_INTERVAL_MS=' .env; then
+  printf 'ANCHOR_WORKER_INTERVAL_MS=5000\n' >>.env
+fi
 docker compose build --pull
+docker compose config --quiet
 docker compose up -d --remove-orphans
 docker compose ps
 

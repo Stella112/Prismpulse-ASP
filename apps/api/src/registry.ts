@@ -1,10 +1,21 @@
 import { addressSchema, digestSchema } from "@prismpulse/schemas";
+import { join } from "node:path";
 import { z } from "zod";
+import {
+  AnchorWorker,
+  FileAnchorJobStore,
+  ViemAnchorSubmitter,
+  type AnchorJobStore,
+} from "./anchor-worker.js";
 
 const registryConfigSchema = z.object({
   XLAYER_RPC_URL: z.string().url(),
   RECEIPT_ANCHOR_ADDRESS: addressSchema,
   XLAYER_EXPLORER_URL: z.string().url().default("https://www.oklink.com/x-layer"),
+  EVIDENCE_SEAL_DIR: z.string().min(1).optional(),
+  ANCHOR_JOB_DIR: z.string().min(1).optional(),
+  ANCHOR_ISSUER_PRIVATE_KEY: z.string().regex(/^0x[a-fA-F0-9]{64}$/).optional(),
+  ANCHOR_WORKER_INTERVAL_MS: z.coerce.number().int().min(1_000).default(5_000),
 });
 
 export type AnchorState = "NOT_CONFIGURED" | "PENDING" | "ANCHORED" | "FAILED";
@@ -16,18 +27,22 @@ export interface AnchorStatus {
   anchoredAt?: string;
   explorerUrl?: string;
   message?: string;
+  transactionHash?: string;
+  attempts?: number;
 }
 
 export interface SealRegistry {
   readonly configured: boolean;
   readonly address?: string;
   readonly explorerUrl?: string;
+  readonly workerEnabled: boolean;
   getStatus(decisionDigest: string): Promise<AnchorStatus>;
   requestAnchor(decisionDigest: string): Promise<AnchorStatus>;
 }
 
 export class UnconfiguredSealRegistry implements SealRegistry {
   readonly configured = false;
+  readonly workerEnabled = false;
 
   async getStatus(_decisionDigest: string): Promise<AnchorStatus> {
     return { state: "NOT_CONFIGURED" };
@@ -40,6 +55,7 @@ export class UnconfiguredSealRegistry implements SealRegistry {
 
 export class XLayerSealRegistry implements SealRegistry {
   readonly configured = true;
+  readonly workerEnabled: boolean;
   readonly address: string;
   readonly explorerUrl: string;
 
@@ -48,9 +64,13 @@ export class XLayerSealRegistry implements SealRegistry {
     address: string,
     explorerBaseUrl: string,
     private readonly fetchImplementation: typeof fetch = fetch,
+    private readonly jobStore?: AnchorJobStore,
+    worker?: AnchorWorker,
   ) {
     this.address = address;
     this.explorerUrl = `${explorerBaseUrl.replace(/\/$/, "")}/address/${address}`;
+    this.workerEnabled = Boolean(worker);
+    worker?.start();
   }
 
   async getStatus(decisionDigest: string): Promise<AnchorStatus> {
@@ -75,10 +95,17 @@ export class XLayerSealRegistry implements SealRegistry {
       const issuer = `0x${encoded.slice(24, 64)}`;
       const timestamp = Number.parseInt(encoded.slice(64, 128), 16);
       if (timestamp === 0) {
+        const job = await this.jobStore?.find(digest);
+        const message =
+          job?.error ??
+          (!this.workerEnabled ? "Anchor issuer worker is not configured." : undefined);
         return {
-          state: "PENDING",
+          state: job?.state === "FAILED" ? "FAILED" : "PENDING",
           registryAddress: this.address,
           explorerUrl: this.explorerUrl,
+          ...(job?.transactionHash ? { transactionHash: job.transactionHash } : {}),
+          ...(job ? { attempts: job.attempts } : {}),
+          ...(message ? { message } : {}),
         };
       }
       return {
@@ -99,8 +126,20 @@ export class XLayerSealRegistry implements SealRegistry {
   }
 
   async requestAnchor(decisionDigest: string): Promise<AnchorStatus> {
-    // Transaction submission belongs behind this boundary in a separately funded issuer worker.
-    return this.getStatus(decisionDigest);
+    const current = await this.getStatus(decisionDigest);
+    if (current.state === "ANCHORED" || !this.jobStore) return current;
+    const job = await this.jobStore.enqueue(digestSchema.parse(decisionDigest));
+    const message = !this.workerEnabled
+      ? "Anchor issuer worker is not configured."
+      : undefined;
+    return {
+      state: "PENDING",
+      registryAddress: this.address,
+      explorerUrl: this.explorerUrl,
+      attempts: job.attempts,
+      ...(job.transactionHash ? { transactionHash: job.transactionHash } : {}),
+      ...(message ? { message } : {}),
+    };
   }
 }
 
@@ -113,9 +152,27 @@ export function createSealRegistry(
     const fields = Object.keys(parsed.error.flatten().fieldErrors).join(", ");
     throw new Error(`Invalid Seal registry configuration: ${fields}`);
   }
+  const jobDirectory =
+    parsed.data.ANCHOR_JOB_DIR ??
+    join(parsed.data.EVIDENCE_SEAL_DIR ?? "./data", "anchors");
+  const jobStore = new FileAnchorJobStore(join(jobDirectory, "queue.json"));
+  const worker = parsed.data.ANCHOR_ISSUER_PRIVATE_KEY
+    ? new AnchorWorker(
+        jobStore,
+        new ViemAnchorSubmitter(
+          parsed.data.XLAYER_RPC_URL,
+          parsed.data.ANCHOR_ISSUER_PRIVATE_KEY as `0x${string}`,
+          parsed.data.RECEIPT_ANCHOR_ADDRESS as `0x${string}`,
+        ),
+        { intervalMs: parsed.data.ANCHOR_WORKER_INTERVAL_MS },
+      )
+    : undefined;
   return new XLayerSealRegistry(
     parsed.data.XLAYER_RPC_URL,
     parsed.data.RECEIPT_ANCHOR_ADDRESS,
     parsed.data.XLAYER_EXPLORER_URL,
+    fetch,
+    jobStore,
+    worker,
   );
 }

@@ -86,6 +86,7 @@ export function createApp(options: AppOptions = {}): Express {
       consoleIssuanceEnabled,
       registry: {
         configured: sealRegistry.configured,
+        workerEnabled: sealRegistry.workerEnabled,
         address: sealRegistry.address,
         explorerUrl: sealRegistry.explorerUrl,
       },

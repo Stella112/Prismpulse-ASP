@@ -34,6 +34,9 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.2.0
+      viem:
+        specifier: 2.55.0
+        version: 2.55.0(typescript@5.9.3)(zod@3.25.76)
       zod:
         specifier: ^3.24.2
         version: 3.25.76
