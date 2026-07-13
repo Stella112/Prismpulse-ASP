@@ -20,6 +20,7 @@
     "lint": "pnpm -r lint",
     "smoke:production": "node scripts/smoke-production.mjs",
     "monitor:production": "node scripts/monitor-production.mjs",
-    "backup:production": "bash infra/backup-vps.sh"
+    "backup:production": "bash infra/backup-vps.sh",
+    "ops:install": "bash infra/install-ops-cron.sh"
   }
 }
