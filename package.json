@@ -18,6 +18,8 @@
     "test:all": "pnpm test && pnpm contracts:test",
     "typecheck": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "smoke:production": "node scripts/smoke-production.mjs"
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "monitor:production": "node scripts/monitor-production.mjs",
+    "backup:production": "bash infra/backup-vps.sh"
   }
 }

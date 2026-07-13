@@ -77,6 +77,27 @@ export function createApp(options: AppOptions = {}): Express {
     response.json({ status: "ok", service: "prismpulse-api" });
   });
 
+  app.get("/v1/readiness", (_request, response) => {
+    const registryReady = sealRegistry.configured && sealRegistry.workerEnabled;
+    const paymentsReady = paymentGate.enabled;
+    const launchReady = registryReady && paymentsReady;
+    response.status(launchReady ? 200 : 503).json({
+      status: launchReady ? "READY" : "NOT_READY",
+      operational: true,
+      launchReady,
+      checks: {
+        api: "READY",
+        registry: registryReady ? "READY" : "NOT_READY",
+        payments: paymentsReady ? "READY" : "NOT_READY",
+        consoleIssuance: consoleIssuanceEnabled ? "READY" : "DISABLED",
+      },
+      actions: [
+        ...(!registryReady ? ["Configure the X Layer registry issuer worker."] : []),
+        ...(!paymentsReady ? ["Configure and enable OKX seller payments."] : []),
+      ],
+    });
+  });
+
   app.get("/v1/metadata", (_request, response) => {
     response.json({
       name: "PrismPulse Sentinel API",
@@ -96,6 +117,7 @@ export function createApp(options: AppOptions = {}): Express {
         "console-seal-issuance",
         "evidence-receipts",
         "registry-status",
+        "launch-readiness",
       ],
     });
   });

@@ -66,6 +66,9 @@ if ! grep -q '^ANCHOR_WORKER_INTERVAL_MS=' .env; then
   printf 'ANCHOR_WORKER_INTERVAL_MS=5000\n' >>.env
 fi
 docker compose config --quiet
+if docker compose ps --status running -q postgres | grep -q .; then
+  bash infra/backup-vps.sh
+fi
 docker compose build --pull
 docker compose up -d --remove-orphans --wait --wait-timeout 120
 docker compose exec -T -u root api chown -R node:node /app/data/seals
