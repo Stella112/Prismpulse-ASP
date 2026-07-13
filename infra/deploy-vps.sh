@@ -65,11 +65,23 @@ fi
 if ! grep -q '^ANCHOR_WORKER_INTERVAL_MS=' .env; then
   printf 'ANCHOR_WORKER_INTERVAL_MS=5000\n' >>.env
 fi
-docker compose build --pull
 docker compose config --quiet
+docker compose build --pull
 docker compose up -d --remove-orphans
+docker compose exec -T -u root api chown -R node:node /app/data/seals
 docker compose ps
 
-SMOKE_BASE_URL=${SMOKE_BASE_URL:-https://getprismpulse.xyz} SMOKE_ISSUE_SEAL=true pnpm smoke:production
+smoke_require_registry=false
+if grep -Eq '^RECEIPT_ANCHOR_ADDRESS=0x[0-9a-fA-F]{40}$' .env && \
+  grep -Eq '^ANCHOR_ISSUER_PRIVATE_KEY=0x[0-9a-fA-F]{64}$' .env; then
+  smoke_require_registry=true
+fi
+
+docker compose exec -T \
+  -e SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://getprismpulse.xyz}" \
+  -e SMOKE_ISSUE_SEAL=true \
+  -e SMOKE_REQUIRE_REGISTRY="${smoke_require_registry}" \
+  api node /app/scripts/smoke-production.mjs
+
 
 echo "PrismPulse deployment completed at $(git rev-parse --short HEAD)."

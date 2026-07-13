@@ -9,6 +9,7 @@ RUN pnpm install --frozen-lockfile
 COPY apps/api apps/api
 COPY packages/schemas packages/schemas
 COPY packages/prism-core packages/prism-core
+COPY scripts/smoke-production.mjs scripts/smoke-production.mjs
 RUN pnpm --filter @prismpulse/api... build
 
 FROM node:20-alpine AS runtime
