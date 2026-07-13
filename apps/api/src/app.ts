@@ -144,6 +144,7 @@ export function createApp(options: AppOptions = {}): Express {
         "five-check-sentinel",
         "passive-hive-immunization",
         "local-llama-reasoning",
+        "a2a-negotiation-escrow-delivery-disputes",
       ],
     });
   });
