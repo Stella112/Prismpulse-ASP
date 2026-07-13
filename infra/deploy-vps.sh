@@ -67,7 +67,7 @@ if ! grep -q '^ANCHOR_WORKER_INTERVAL_MS=' .env; then
 fi
 docker compose config --quiet
 docker compose build --pull
-docker compose up -d --remove-orphans
+docker compose up -d --remove-orphans --wait --wait-timeout 120
 docker compose exec -T -u root api chown -R node:node /app/data/seals
 docker compose ps
 
