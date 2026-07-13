@@ -13,7 +13,24 @@ services:
     volumes:
       - evidence_seals:/app/data/seals
     depends_on:
-      ollama:
+      postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4021/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 768m
+
+  ollama:
     image: ollama/ollama:0.30.8
     restart: unless-stopped
     volumes:
@@ -37,23 +54,6 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     mem_limit: 512m
-
-  postgres:
-        condition: service_healthy
-      ollama-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:4021/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    mem_limit: 768m
 
   postgres:
     image: postgres:16-alpine
