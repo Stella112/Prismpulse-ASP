@@ -57,7 +57,7 @@ export function createPaymentGate(
           price: parsed.data.SENTINEL_PRICE_USD,
           maxTimeoutSeconds: 300,
         },
-        description: "Evidence-backed PrismPulse Sentinel transaction check",
+        description: "Evidence-backed PrismPulse Sentinel transaction check. Request schema and example: https://api.getprismpulse.xyz/v1/sentinel/schema",
         mimeType: "application/json",
       },
     },

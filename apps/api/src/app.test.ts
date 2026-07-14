@@ -94,7 +94,112 @@ async function post(
   );
 }
 
+async function requestFromApp(
+  app: ReturnType<typeof createApp>,
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server!.once("listening", resolve));
+  const { port } = server.address() as AddressInfo;
+  return fetch(`http://127.0.0.1:${port}${path}`, options);
+}
 describe("POST /v1/sentinel/check", () => {
+  it("publishes a machine-readable schema and copy-paste example", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.PAYMENTS_ENABLED = "false";
+    const response = await request("/v1/sentinel/schema");
+    const body = (await response.json()) as {
+      properties: { intent: { required: string[] } };
+      examples: unknown[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/schema+json");
+    expect(body.properties.intent.required).toEqual([
+      "from",
+      "to",
+      "declaredPurpose",
+    ]);
+    expect(body.examples[0]).toMatchObject({
+      intent: {
+        from: validRequest.intent.from,
+        to: validRequest.intent.to,
+        declaredPurpose: validRequest.intent.declaredPurpose,
+      },
+    });
+  });
+
+  it("accepts the marketplace task wrapper with safe X Layer defaults", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.PAYMENTS_ENABLED = "false";
+    const response = await post("/v1/sentinel/check", {
+      task: {
+        walletAddress: validRequest.intent.from,
+        targetAddress: validRequest.intent.to,
+        description: validRequest.intent.declaredPurpose,
+      },
+    });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("lets unsigned discovery reach x402 while blocking malformed signed replays before settlement", async () => {
+    process.env.NODE_ENV = "test";
+    let paymentMiddlewareReached = false;
+    const createTestApp = () =>
+      createApp({
+        collectEvidence: async () => inspection,
+        sealStore: new MemoryEvidenceSealStore(),
+        paymentGate: {
+          enabled: true,
+          middleware: (_request, response, next) => {
+            paymentMiddlewareReached = true;
+            if (_request.headers["payment-signature"]) {
+              next();
+              return;
+            }
+            response.status(402).json({ error: "PAYMENT_REQUIRED" });
+          },
+        },
+      });
+
+    const unsigned = await requestFromApp(createTestApp(), "/v1/sentinel/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intent: { chainId: 196 } }),
+    });
+    expect(unsigned.status).toBe(402);
+    expect(paymentMiddlewareReached).toBe(true);
+    server?.close();
+    server = undefined;
+
+    paymentMiddlewareReached = false;
+    const signed = await requestFromApp(createTestApp(), "/v1/sentinel/check", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "payment-signature": "invalid-but-present",
+      },
+      body: JSON.stringify({ intent: { chainId: 196 } }),
+    });
+    const body = (await signed.json()) as {
+      required: string[];
+      message: string;
+    };
+
+    expect(signed.status).toBe(400);
+    expect(paymentMiddlewareReached).toBe(false);
+    expect(body.required).toEqual(
+      expect.arrayContaining([
+        "intent.from",
+        "intent.to",
+        "intent.declaredPurpose",
+      ]),
+    );
+    expect(body.message).toContain("No payment was processed");
+  });
+
   it("returns an evidence-backed verdict and seal in development", async () => {
     process.env.NODE_ENV = "test";
     process.env.PAYMENTS_ENABLED = "false";

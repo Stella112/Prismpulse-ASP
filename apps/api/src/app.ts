@@ -10,11 +10,19 @@ import {
 } from "@prismpulse/schemas";
 import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
-import { createPaymentGate } from "./payments.js";
+import { createPaymentGate, type PaymentGate } from "./payments.js";
 import { createHiveStore, type HiveStore } from "./hive.js";
 import { arbitratePayloadAssessments, createLocalReasoner, type LocalReasoner } from "./reasoner.js";
 import { createSealRegistry, type SealRegistry } from "./registry.js";
 import { attestSeal, verifySealRecord } from "./seal-attestation.js";
+import {
+  formatSentinelValidationError,
+  parseSentinelRequest,
+  SENTINEL_REQUEST_EXAMPLE,
+  SENTINEL_REQUEST_SCHEMA,
+  SENTINEL_SCHEMA_PATH,
+  validateSentinelBeforeSettlement,
+} from "./sentinel-request.js";
 import {
   createEvidenceSealStore,
   type EvidenceSealStore,
@@ -46,6 +54,7 @@ export interface AppOptions {
   sealRegistry?: SealRegistry;
   hiveStore?: HiveStore;
   reasoner?: LocalReasoner;
+  paymentGate?: PaymentGate;
 }
 
 function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
@@ -79,7 +88,7 @@ function createPulseRateLimit(limit = 20, windowMs = 60_000): RequestHandler {
 
 export function createApp(options: AppOptions = {}): Express {
   const app = express();
-  const paymentGate = createPaymentGate(process.env);
+  const paymentGate = options.paymentGate ?? createPaymentGate(process.env);
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
   const sealStore = options.sealStore ?? createEvidenceSealStore(process.env);
   const sealRegistry = options.sealRegistry ?? createSealRegistry(process.env);
@@ -94,12 +103,20 @@ export function createApp(options: AppOptions = {}): Express {
   app.use(helmet());
   app.use(cors({ origin: false }));
   app.use(express.json({ limit: "256kb" }));
+  app.use(validateSentinelBeforeSettlement);
   if (paymentGate.enabled) {
     app.use(paymentGate.middleware);
   }
 
   app.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "prismpulse-api" });
+  });
+
+  app.get(SENTINEL_SCHEMA_PATH, (_request, response) => {
+    response
+      .setHeader("Cache-Control", "public, max-age=300")
+      .type("application/schema+json")
+      .json(SENTINEL_REQUEST_SCHEMA);
   });
 
   app.get("/v1/readiness", async (_request, response) => {
@@ -173,6 +190,19 @@ export function createApp(options: AppOptions = {}): Express {
         ...(!autonomousExecution ? ["bounded-dex-execution"] : []),
         ...(!gasVault ? ["gas-vault-auto-refill"] : []),
         ...(!a2a ? ["a2a-negotiation-escrow-delivery-disputes"] : []),
+      ],
+      services: [
+        {
+          name: "sentinel-check",
+          method: "POST",
+          endpoint: "https://api.getprismpulse.xyz/v1/sentinel/check",
+          price: process.env.SENTINEL_PRICE_USD ?? "$0.01",
+          paymentProtocol: "x402",
+          requestSchemaUrl:
+            "https://api.getprismpulse.xyz" + SENTINEL_SCHEMA_PATH,
+          requestSchema: SENTINEL_REQUEST_SCHEMA,
+          exampleRequest: SENTINEL_REQUEST_EXAMPLE,
+        },
       ],
     });
   });
@@ -365,17 +395,14 @@ export function createApp(options: AppOptions = {}): Express {
       return;
     }
 
-    const parsed = checkRequestSchema.safeParse(request.body);
+    const parsed = parseSentinelRequest(request.body);
     if (!parsed.success) {
-      response.status(400).json({
-        error: "INVALID_REQUEST",
-        details: parsed.error.flatten(),
-      });
+      response.status(400).json(formatSentinelValidationError(parsed.error));
       return;
     }
 
     try {
-      response.status(201).json(await issueSeal(parsed.data.intent));
+      response.status(201).json(await issueSeal(parsed.data));
     } catch (error) {
       if (error instanceof EvidenceUnavailableError) {
         response.status(502).json({ error: "EVIDENCE_UNAVAILABLE", message: error.message });
