@@ -49,6 +49,20 @@ describe("arbitratePayloadAssessments", () => {
     )).toMatchObject({ status: "BLOCK", decision: "MODEL_BLOCK" });
   });
 
+  it("treats ungrounded model ambiguity as advisory", () => {
+    expect(arbitratePayloadAssessments(
+      { status: "PASS", confidence: 0.9 },
+      { status: "UNKNOWN", confidence: 0.9, reasons: ["concealed redirect"] },
+    )).toMatchObject({ status: "PASS", decision: "MODEL_UNKNOWN_DISMISSED" });
+  });
+
+  it("fails closed when the model runtime is unavailable", () => {
+    expect(arbitratePayloadAssessments(
+      { status: "PASS", confidence: 0.9 },
+      { status: "UNKNOWN", confidence: 0, reasons: ["MODEL_UNAVAILABLE"] },
+    )).toMatchObject({ status: "UNKNOWN", decision: "MODEL_UNKNOWN" });
+  });
+
   it("never lets the model override a deterministic block", () => {
     expect(arbitratePayloadAssessments(
       { status: "BLOCK", confidence: 1 },

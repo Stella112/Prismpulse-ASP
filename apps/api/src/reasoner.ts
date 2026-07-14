@@ -11,7 +11,7 @@ export type ReasoningAssessment = z.infer<typeof assessmentSchema>;
 export interface PayloadArbitration {
   status: ReasoningAssessment["status"];
   confidence: number;
-  decision: "DETERMINISTIC_BLOCK" | "DETERMINISTIC_UNKNOWN" | "MODEL_BLOCK" | "MODEL_UNKNOWN" | "MODEL_BLOCK_DISMISSED" | "PASS";
+  decision: "DETERMINISTIC_BLOCK" | "DETERMINISTIC_UNKNOWN" | "MODEL_BLOCK" | "MODEL_UNKNOWN" | "MODEL_UNKNOWN_DISMISSED" | "MODEL_BLOCK_DISMISSED" | "PASS";
   minimumModelBlockConfidence: number;
 }
 
@@ -23,7 +23,7 @@ export interface LocalReasoner {
 export function arbitratePayloadAssessments(
   deterministic: { status: ReasoningAssessment["status"]; confidence: number },
   model: ReasoningAssessment,
-  minimumModelBlockConfidence = 0.9,
+  minimumModelBlockConfidence = 0.95,
 ): PayloadArbitration {
   const threshold = Math.min(1, Math.max(0.5, minimumModelBlockConfidence));
   if (deterministic.status === "BLOCK") {
@@ -33,7 +33,16 @@ export function arbitratePayloadAssessments(
     return { status: "UNKNOWN", confidence: deterministic.confidence, decision: "DETERMINISTIC_UNKNOWN", minimumModelBlockConfidence: threshold };
   }
   if (model.status === "UNKNOWN") {
-    return { status: "UNKNOWN", confidence: model.confidence, decision: "MODEL_UNKNOWN", minimumModelBlockConfidence: threshold };
+    const unavailable = model.reasons.some((reason) => ["MODEL_UNAVAILABLE", "MODEL_HTTP_ERROR", "MODEL_RESPONSE_MISSING"].includes(reason));
+    if (unavailable) {
+      return { status: "UNKNOWN", confidence: model.confidence, decision: "MODEL_UNKNOWN", minimumModelBlockConfidence: threshold };
+    }
+    return {
+      status: "PASS",
+      confidence: Math.min(deterministic.confidence, 0.5),
+      decision: "MODEL_UNKNOWN_DISMISSED",
+      minimumModelBlockConfidence: threshold,
+    };
   }
   if (model.status === "BLOCK" && model.confidence >= threshold) {
     return { status: "BLOCK", confidence: model.confidence, decision: "MODEL_BLOCK", minimumModelBlockConfidence: threshold };
@@ -60,7 +69,8 @@ export function createLocalReasoner(
 ): LocalReasoner {
   const baseUrl = (environment.OLLAMA_BASE_URL ?? "http://ollama:11434").replace(/\/$/, "");
   const model = environment.OLLAMA_MODEL ?? "llama3.2:1b";
-  const timeoutMs = Number(environment.OLLAMA_TIMEOUT_MS ?? 20_000);
+  const timeoutMs = Number(environment.OLLAMA_TIMEOUT_MS ?? 60_000);
+  const keepAlive = environment.OLLAMA_KEEP_ALIVE ?? "24h";
 
   async function ready(): Promise<boolean> {
     try {
@@ -82,6 +92,7 @@ export function createLocalReasoner(
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          keep_alive: keepAlive,
           model,
           stream: false,
           format: "json",

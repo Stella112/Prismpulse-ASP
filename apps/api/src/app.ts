@@ -255,7 +255,7 @@ export function createApp(options: AppOptions = {}): Express {
     const payloadArbitration = arbitratePayloadAssessments(
       deterministicInspection,
       modelInspection,
-      Number(process.env.LLAMA_BLOCK_CONFIDENCE_MIN ?? 0.9),
+      Number(process.env.LLAMA_BLOCK_CONFIDENCE_MIN ?? 0.95),
     );
     const payloadStatus: PayloadInspectionStatus = payloadArbitration.status;
     const amountUsd = intent.transactionAmountUsd ?? (intent.value === "0" ? 0 : undefined);
