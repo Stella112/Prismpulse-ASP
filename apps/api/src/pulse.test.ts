@@ -46,6 +46,7 @@ describe("collectXLayerEvidence", () => {
     expect(result.evidence[1]?.value).toEqual({
       hasBytecode: true,
       byteLength: 4,
+      effectRecipient: intent.to,
     });
   });
 
@@ -60,6 +61,7 @@ describe("collectXLayerEvidence", () => {
     });
 
     expect(result.signals.approvalIsUnlimited).toBe(true);
+    expect(result.effectRecipient).toBe(`0x${"3".repeat(40)}`);
   });
 
   it("records an RPC simulation revert as a failed simulation", async () => {

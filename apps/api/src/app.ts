@@ -2,13 +2,19 @@ import cors from "cors";
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import { createEvidenceSeal, evaluateTransaction, inspectPayloadText, type PayloadInspectionStatus } from "@prismpulse/core";
-import { digestSchema, transactionIntentSchema } from "@prismpulse/schemas";
+import {
+  digestSchema,
+  evidenceSealSchema,
+  sentinelVerdictSchema,
+  transactionIntentSchema,
+} from "@prismpulse/schemas";
 import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
 import { createHiveStore, type HiveStore } from "./hive.js";
 import { createLocalReasoner, type LocalReasoner } from "./reasoner.js";
 import { createSealRegistry, type SealRegistry } from "./registry.js";
+import { attestSeal, verifySealRecord } from "./seal-attestation.js";
 import {
   createEvidenceSealStore,
   type EvidenceSealStore,
@@ -26,6 +32,12 @@ const checkRequestSchema = z.object({
 const hiveCaptureSchema = z.object({
   payload: z.string().min(3).max(20_000),
   source: z.string().min(3).max(200),
+});
+
+const sealVerificationSchema = z.object({
+  seal: evidenceSealSchema,
+  intent: transactionIntentSchema,
+  verdict: sentinelVerdictSchema,
 });
 
 export interface AppOptions {
@@ -122,6 +134,25 @@ export function createApp(options: AppOptions = {}): Express {
   });
 
   app.get("/v1/metadata", (_request, response) => {
+    const autonomousExecution = process.env.AUTONOMOUS_EXECUTION_ENABLED === "true";
+    const gasVault = process.env.GAS_VAULT_ENABLED === "true";
+    const a2a = Boolean(process.env.A2A_AGENT_ID);
+    const capabilities = [
+      "pulse-inspection",
+      "sentinel-check",
+      "console-seal-issuance",
+      "evidence-receipts",
+      "signed-evidence-receipts",
+      "public-seal-verification",
+      "registry-status",
+      "launch-readiness",
+      "five-check-sentinel",
+      "passive-hive-immunization",
+      "local-llama-reasoning",
+      ...(autonomousExecution ? ["bounded-dex-execution"] : []),
+      ...(gasVault ? ["gas-vault-auto-refill"] : []),
+      ...(a2a ? ["a2a-negotiation-escrow-delivery-disputes"] : []),
+    ];
     response.json({
       name: "PrismPulse Sentinel API",
       version: "0.1.0",
@@ -134,19 +165,33 @@ export function createApp(options: AppOptions = {}): Express {
         address: sealRegistry.address,
         explorerUrl: sealRegistry.explorerUrl,
       },
-      capabilities: [
-        "pulse-inspection",
-        "sentinel-check",
-        "console-seal-issuance",
-        "evidence-receipts",
-        "registry-status",
-        "launch-readiness",
-        "five-check-sentinel",
-        "passive-hive-immunization",
-        "local-llama-reasoning",
-        "a2a-negotiation-escrow-delivery-disputes",
+      productStatus: a2a && autonomousExecution && gasVault
+        ? "FULL_RUNTIME_READY"
+        : "SENTINEL_SERVICE_READY",
+      capabilities,
+      unavailableCapabilities: [
+        ...(!autonomousExecution ? ["bounded-dex-execution"] : []),
+        ...(!gasVault ? ["gas-vault-auto-refill"] : []),
+        ...(!a2a ? ["a2a-negotiation-escrow-delivery-disputes"] : []),
       ],
     });
+  });
+
+  app.post("/v1/seals/verify", async (request, response) => {
+    const parsed = sealVerificationSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({
+        error: "INVALID_SEAL_RECORD",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+    try {
+      const result = await verifySealRecord(parsed.data);
+      response.status(result.valid ? 200 : 422).json(result);
+    } catch {
+      response.status(422).json({ valid: false, error: "SEAL_VERIFICATION_FAILED" });
+    }
   });
 
   app.get("/v1/seals/:decisionDigest", async (request, response) => {
@@ -211,6 +256,13 @@ export function createApp(options: AppOptions = {}): Express {
       ? "BLOCK"
       : deterministicInspection.status === "UNKNOWN" || modelInspection.status === "UNKNOWN" ? "UNKNOWN" : "PASS";
     const amountUsd = intent.transactionAmountUsd ?? (intent.value === "0" ? 0 : undefined);
+    const effectRecipient = (inspection.effectRecipient ?? intent.to).toLowerCase();
+    const knownCounterparties = new Set(
+      (process.env.KNOWN_COUNTERPARTY_ADDRESSES ?? "")
+        .split(",")
+        .map((address) => address.trim().toLowerCase())
+        .filter(Boolean),
+    );
     const evidence = inspection.evidence.filter((claim) => !claim.id.startsWith("signature-scan-")).concat([
       {
         id: "hive-scan-" + inspection.blockNumber,
@@ -241,13 +293,17 @@ export function createApp(options: AppOptions = {}): Express {
         status: payloadStatus,
         confidence: Math.min(deterministicInspection.confidence, modelInspection.confidence),
       },
-      effectRecipientMatches: intent.expectedRecipient ? intent.expectedRecipient.toLowerCase() === intent.to.toLowerCase() : true,
+      effectRecipientMatches: intent.expectedRecipient
+        ? intent.expectedRecipient.toLowerCase() === effectRecipient
+        : true,
       knownAttackSignature: hive.matched,
       counterpartyAnomalyScore: hive.anomalyScore,
       counterparty: {
-        identityResolved: false,
+        identityResolved: knownCounterparties.has(effectRecipient),
         highValue: amountUsd === undefined || amountUsd >= Number(process.env.SENTINEL_HIGH_VALUE_USD ?? 100),
-        knownVendorAddressChanged: false,
+        knownVendorAddressChanged: Boolean(
+          intent.expectedRecipient && intent.expectedRecipient.toLowerCase() !== effectRecipient,
+        ),
       },
       spendPolicy: amountUsd === undefined ? undefined : {
         killSwitchActive: process.env.GLOBAL_KILL_SWITCH === "true",
@@ -259,7 +315,7 @@ export function createApp(options: AppOptions = {}): Express {
       },
     };
     const verdict = evaluateTransaction(intent, signals, evidence);
-    const seal = createEvidenceSeal(intent, verdict);
+    const seal = await attestSeal(createEvidenceSeal(intent, verdict));
     const record = { verdict, seal, intent, storedAt: new Date().toISOString() };
     await sealStore.save(record);
     const anchoring = await sealRegistry.requestAnchor(seal.decisionDigest);

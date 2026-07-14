@@ -11,7 +11,13 @@ interface IERC20Minimal {
 /// @notice Proof-of-concept underwriting rails: capped, parametric, objective-trigger micro-coverage.
 /// @dev This contract is not a regulated insurance product.
 contract PrismBondPool {
-    enum CoverageState { NONE, ACTIVE, CLAIM_PENDING, PAID, CANCELLED }
+    enum CoverageState {
+        NONE,
+        ACTIVE,
+        CLAIM_PENDING,
+        PAID,
+        CANCELLED
+    }
 
     struct Coverage {
         address beneficiary;
@@ -45,17 +51,33 @@ contract PrismBondPool {
 
     event Deposited(address indexed staker, uint256 assets, uint256 shares);
     event Withdrawn(address indexed staker, uint256 assets, uint256 shares);
-    event CoverageBound(bytes32 indexed coverageId, address indexed beneficiary, uint256 amount, uint256 premium, bytes32 sentinelReceiptHash);
+    event CoverageBound(
+        bytes32 indexed coverageId,
+        address indexed beneficiary,
+        uint256 amount,
+        uint256 premium,
+        bytes32 sentinelReceiptHash
+    );
     event PayoutRequested(bytes32 indexed coverageId, bytes32 evidenceHash, uint64 eligibleAt);
     event PayoutVetoed(bytes32 indexed coverageId, address indexed guardian);
-    event PayoutFinalized(bytes32 indexed coverageId, address indexed beneficiary, uint256 amount, bytes32 evidenceHash);
+    event PayoutFinalized(
+        bytes32 indexed coverageId,
+        address indexed beneficiary,
+        uint256 amount,
+        bytes32 evidenceHash
+    );
     event CoverageExpired(bytes32 indexed coverageId);
     event PayoutPauseSet(bool paused);
     event KillSwitchSet(bool active);
     event GuardianSet(address indexed guardian);
     event UnderwriterAuthorizationSet(address indexed underwriter, bool authorized);
     event OracleAuthorizationSet(address indexed oracle, bool authorized);
-    event LimitsSet(uint256 perTransactionCap, uint256 globalExposureCap, uint256 tinyPayoutThreshold, uint64 payoutDelay);
+    event LimitsSet(
+        uint256 perTransactionCap,
+        uint256 globalExposureCap,
+        uint256 tinyPayoutThreshold,
+        uint64 payoutDelay
+    );
     event OwnershipTransferStarted(address indexed currentOwner, address indexed pendingOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -90,31 +112,62 @@ contract PrismBondPool {
         uint256 initialTinyPayoutThreshold,
         uint64 initialPayoutDelay
     ) {
-        if (assetAddress == address(0) || initialOwner == address(0) || initialGuardian == address(0)) revert InvalidAddress();
-        if (initialPerTransactionCap == 0 || initialGlobalExposureCap < initialPerTransactionCap) revert InvalidAmount();
+        if (
+            assetAddress == address(0) || initialOwner == address(0)
+                || initialGuardian == address(0)
+        ) revert InvalidAddress();
+        if (initialPerTransactionCap == 0 || initialGlobalExposureCap < initialPerTransactionCap) {
+            revert InvalidAmount();
+        }
         asset = IERC20Minimal(assetAddress);
         owner = initialOwner;
         guardian = initialGuardian;
         authorizedUnderwriters[initialOwner] = true;
         authorizedOracles[initialOwner] = true;
-        _setLimits(initialPerTransactionCap, initialGlobalExposureCap, initialTinyPayoutThreshold, initialPayoutDelay);
+        _setLimits(
+            initialPerTransactionCap,
+            initialGlobalExposureCap,
+            initialTinyPayoutThreshold,
+            initialPayoutDelay
+        );
         emit OwnershipTransferred(address(0), initialOwner);
         emit GuardianSet(initialGuardian);
         emit UnderwriterAuthorizationSet(initialOwner, true);
         emit OracleAuthorizationSet(initialOwner, true);
     }
 
-    modifier onlyOwner() { if (msg.sender != owner) revert NotOwner(); _; }
-    modifier onlyGuardian() { if (msg.sender != guardian) revert NotGuardian(); _; }
-    modifier onlyUnderwriter() { if (!authorizedUnderwriters[msg.sender]) revert NotUnderwriter(); _; }
-    modifier onlyOracle() { if (!authorizedOracles[msg.sender]) revert NotOracle(); _; }
-    modifier nonReentrant() { if (entered != 1) revert ReentrantCall(); entered = 2; _; entered = 1; }
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+    modifier onlyGuardian() {
+        if (msg.sender != guardian) revert NotGuardian();
+        _;
+    }
+    modifier onlyUnderwriter() {
+        if (!authorizedUnderwriters[msg.sender]) revert NotUnderwriter();
+        _;
+    }
+    modifier onlyOracle() {
+        if (!authorizedOracles[msg.sender]) revert NotOracle();
+        _;
+    }
+    modifier nonReentrant() {
+        if (entered != 1) revert ReentrantCall();
+        entered = 2;
+        _;
+        entered = 1;
+    }
 
-    function totalCapital() public view returns (uint256) { return asset.balanceOf(address(this)); }
+    function totalCapital() public view returns (uint256) {
+        return asset.balanceOf(address(this));
+    }
+
     function availableCapital() public view returns (uint256) {
         uint256 capital = totalCapital();
         return capital > coveredExposure ? capital - coveredExposure : 0;
     }
+
     function lossRatioBps() external view returns (uint256) {
         uint256 earned = totalPremiums;
         return earned == 0 ? (totalLosses == 0 ? 0 : 10_000) : totalLosses * 10_000 / earned;
@@ -151,12 +204,20 @@ contract PrismBondPool {
     ) external onlyUnderwriter nonReentrant returns (bytes32 coverageId) {
         if (globalKillSwitch) revert KillSwitchActive();
         if (beneficiary == address(0)) revert InvalidAddress();
-        if (coveredAmount == 0 || premium == 0 || expiry <= block.timestamp) revert InvalidAmount();
-        if (sentinelReceiptHash == bytes32(0) || triggerSpecHash == bytes32(0)) revert InvalidHash();
-        if (coveredAmount > perTransactionCap || coveredExposure + coveredAmount > globalExposureCap) revert CoverageCapExceeded();
+        if (coveredAmount == 0 || premium == 0 || expiry <= block.timestamp) {
+            revert InvalidAmount();
+        }
+        if (sentinelReceiptHash == bytes32(0) || triggerSpecHash == bytes32(0)) {
+            revert InvalidHash();
+        }
+        if (
+            coveredAmount > perTransactionCap || coveredExposure + coveredAmount > globalExposureCap
+        ) revert CoverageCapExceeded();
         _safeTransferFrom(msg.sender, address(this), premium);
         if (coveredExposure + coveredAmount > totalCapital()) revert InsufficientCapital();
-        coverageId = keccak256(abi.encode(block.chainid, address(this), ++nonce, beneficiary, sentinelReceiptHash));
+        coverageId = keccak256(
+            abi.encode(block.chainid, address(this), ++nonce, beneficiary, sentinelReceiptHash)
+        );
         coverages[coverageId] = Coverage({
             beneficiary: beneficiary,
             coveredAmount: coveredAmount,
@@ -175,7 +236,9 @@ contract PrismBondPool {
 
     function requestPayout(bytes32 coverageId, bytes32 evidenceHash) external onlyOracle {
         Coverage storage coverage = coverages[coverageId];
-        if (coverage.state != CoverageState.ACTIVE || block.timestamp > coverage.expiry) revert InvalidState();
+        if (coverage.state != CoverageState.ACTIVE || block.timestamp > coverage.expiry) {
+            revert InvalidState();
+        }
         if (evidenceHash == bytes32(0)) revert InvalidHash();
         uint64 delay = coverage.coveredAmount > tinyPayoutThreshold ? payoutDelay : 0;
         coverage.claimEvidenceHash = evidenceHash;
@@ -203,50 +266,90 @@ contract PrismBondPool {
         coveredExposure -= coverage.coveredAmount;
         totalLosses += coverage.coveredAmount;
         _safeTransfer(coverage.beneficiary, coverage.coveredAmount);
-        emit PayoutFinalized(coverageId, coverage.beneficiary, coverage.coveredAmount, coverage.claimEvidenceHash);
+        emit PayoutFinalized(
+            coverageId, coverage.beneficiary, coverage.coveredAmount, coverage.claimEvidenceHash
+        );
     }
 
     function expireCoverage(bytes32 coverageId) external {
         Coverage storage coverage = coverages[coverageId];
-        if (coverage.state != CoverageState.ACTIVE || block.timestamp <= coverage.expiry) revert InvalidState();
+        if (coverage.state != CoverageState.ACTIVE || block.timestamp <= coverage.expiry) {
+            revert InvalidState();
+        }
         coverage.state = CoverageState.CANCELLED;
         coveredExposure -= coverage.coveredAmount;
         emit CoverageExpired(coverageId);
     }
 
-    function setPayoutsPaused(bool paused) external onlyGuardian { payoutsPaused = paused; emit PayoutPauseSet(paused); }
-    function setGlobalKillSwitch(bool active) external onlyOwner { globalKillSwitch = active; emit KillSwitchSet(active); }
+    function setPayoutsPaused(bool paused) external onlyGuardian {
+        payoutsPaused = paused;
+        emit PayoutPauseSet(paused);
+    }
+
+    function setGlobalKillSwitch(bool active) external onlyOwner {
+        globalKillSwitch = active;
+        emit KillSwitchSet(active);
+    }
+
     function setGuardian(address nextGuardian) external onlyOwner {
-        if (nextGuardian == address(0)) revert InvalidAddress(); guardian = nextGuardian; emit GuardianSet(nextGuardian);
+        if (nextGuardian == address(0)) revert InvalidAddress();
+        guardian = nextGuardian;
+        emit GuardianSet(nextGuardian);
     }
+
     function setUnderwriterAuthorization(address underwriter, bool authorized) external onlyOwner {
-        if (underwriter == address(0)) revert InvalidAddress(); authorizedUnderwriters[underwriter] = authorized; emit UnderwriterAuthorizationSet(underwriter, authorized);
+        if (underwriter == address(0)) revert InvalidAddress();
+        authorizedUnderwriters[underwriter] = authorized;
+        emit UnderwriterAuthorizationSet(underwriter, authorized);
     }
+
     function setOracleAuthorization(address oracle, bool authorized) external onlyOwner {
-        if (oracle == address(0)) revert InvalidAddress(); authorizedOracles[oracle] = authorized; emit OracleAuthorizationSet(oracle, authorized);
+        if (oracle == address(0)) revert InvalidAddress();
+        authorizedOracles[oracle] = authorized;
+        emit OracleAuthorizationSet(oracle, authorized);
     }
-    function setLimits(uint256 txCap, uint256 exposureCap, uint256 tinyThreshold, uint64 delay) external onlyOwner {
+
+    function setLimits(uint256 txCap, uint256 exposureCap, uint256 tinyThreshold, uint64 delay)
+        external
+        onlyOwner
+    {
         _setLimits(txCap, exposureCap, tinyThreshold, delay);
     }
-    function _setLimits(uint256 txCap, uint256 exposureCap, uint256 tinyThreshold, uint64 delay) private {
+
+    function _setLimits(uint256 txCap, uint256 exposureCap, uint256 tinyThreshold, uint64 delay)
+        private
+    {
         if (txCap == 0 || exposureCap < txCap) revert InvalidAmount();
-        perTransactionCap = txCap; globalExposureCap = exposureCap; tinyPayoutThreshold = tinyThreshold; payoutDelay = delay;
+        perTransactionCap = txCap;
+        globalExposureCap = exposureCap;
+        tinyPayoutThreshold = tinyThreshold;
+        payoutDelay = delay;
         emit LimitsSet(txCap, exposureCap, tinyThreshold, delay);
     }
+
     function beginOwnershipTransfer(address nextOwner) external onlyOwner {
-        if (nextOwner == address(0)) revert InvalidAddress(); pendingOwner = nextOwner; emit OwnershipTransferStarted(owner, nextOwner);
+        if (nextOwner == address(0)) revert InvalidAddress();
+        pendingOwner = nextOwner;
+        emit OwnershipTransferStarted(owner, nextOwner);
     }
+
     function acceptOwnership() external {
         if (msg.sender != pendingOwner) revert NotPendingOwner();
-        address previousOwner = owner; owner = msg.sender; pendingOwner = address(0); emit OwnershipTransferred(previousOwner, msg.sender);
+        address previousOwner = owner;
+        owner = msg.sender;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, msg.sender);
     }
 
     function _safeTransfer(address to, uint256 amount) private {
-        (bool success, bytes memory data) = address(asset).call(abi.encodeCall(IERC20Minimal.transfer, (to, amount)));
+        (bool success, bytes memory data) =
+            address(asset).call(abi.encodeCall(IERC20Minimal.transfer, (to, amount)));
         if (!success || (data.length != 0 && !abi.decode(data, (bool)))) revert TransferFailed();
     }
+
     function _safeTransferFrom(address from, address to, uint256 amount) private {
-        (bool success, bytes memory data) = address(asset).call(abi.encodeCall(IERC20Minimal.transferFrom, (from, to, amount)));
+        (bool success, bytes memory data) =
+            address(asset).call(abi.encodeCall(IERC20Minimal.transferFrom, (from, to, amount)));
         if (!success || (data.length != 0 && !abi.decode(data, (bool)))) revert TransferFailed();
     }
 }

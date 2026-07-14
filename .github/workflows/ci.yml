@@ -22,5 +22,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@v1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - run: pnpm test:all
+      - run: forge fmt --check --root contracts
+      - run: pnpm audit --prod --audit-level high

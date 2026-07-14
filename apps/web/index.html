@@ -90,6 +90,11 @@
               </div>
 
               <label>
+                Transaction amount (USD)
+                <input id="amount-usd" name="transactionAmountUsd" inputmode="decimal" type="number" min="0" step="0.000001" value="0" required />
+              </label>
+
+              <label>
                 Calldata
                 <textarea id="calldata" name="data" rows="3" spellcheck="false">0x</textarea>
               </label>
@@ -167,9 +172,9 @@
           <div class="section-intro"><p class="section-label">SIGNATURE INTELLIGENCE</p><p>Reviewed attack patterns available to Sentinel.</p></div>
           <div class="state-table">
             <div class="table-head"><span>Registry</span><span>Status</span><span>Activation</span></div>
-            <div class="table-row"><strong>Hive Core</strong><span class="state-warning">Not active</span><span>Review gate required</span></div>
-            <div class="table-row"><strong>Known signatures</strong><span>0</span><span>No production entries</span></div>
-            <div class="table-row"><strong>Honeypot intake</strong><span class="state-warning">Offline</span><span>Worker pending</span></div>
+            <div class="table-row"><strong>Hive Core</strong><span id="hive-core-state">Checking</span><span>Sentinel propagation</span></div>
+            <div class="table-row"><strong>Known signatures</strong><span id="hive-signature-count">Checking</span><span>Active production entries</span></div>
+            <div class="table-row"><strong>Honeypot intake</strong><span id="hive-intake-state">Checking</span><span>Authenticated capture endpoint</span></div>
           </div>
         </section>
 

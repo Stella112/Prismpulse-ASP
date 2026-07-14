@@ -165,11 +165,24 @@ export class BoundedSwapExecutor {
       return outcome;
     }
 
+    const requestedAmount = Number(plan.request.readableAmount);
+    const probeFraction = plan.request.declaredUsdValue > 0
+      ? Math.min(1, 0.08 / plan.request.declaredUsdValue)
+      : 1;
+    const probeAmount = requestedAmount * probeFraction;
+    if (!Number.isFinite(probeAmount) || probeAmount <= 0) {
+      const outcome: ExecutionOutcome = {
+        state: "BLOCKED",
+        plan,
+        reasons: ["INVALID_PROBE_AMOUNT"],
+      };
+      await this.journal.append({ kind: "SWAP_BLOCKED", outcome });
+      return outcome;
+    }
     const probeRequest = {
       ...plan.request,
-      from: "okb",
-      readableAmount: "0.001",
-      declaredUsdValue: 0.08,
+      readableAmount: probeAmount.toFixed(12).replace(/0+$/, "").replace(/\.$/, ""),
+      declaredUsdValue: Math.min(0.08, plan.request.declaredUsdValue),
       purpose: "PrismPulse micro-proving swap",
     };
     let probe = await this.invokeExecute(probeRequest);
@@ -188,6 +201,7 @@ export class BoundedSwapExecutor {
       execution = await this.invokeExecute(plan.request, true);
     }
     const state = execution.exitCode === 0 ? "BROADCAST" : execution.exitCode === 2 ? "CONFIRMATION_REQUIRED" : "FAILED";
+    if (state === "BROADCAST") this.policy.rollingDailyUsd += plan.request.declaredUsdValue;
     const outcome: ExecutionOutcome = {
       state,
       plan,

@@ -95,7 +95,7 @@ describe("BoundedSwapExecutor", () => {
     const outcome = await executor.execute(await executor.plan(request));
     expect(outcome.state).toBe("BROADCAST");
     expect(runner.calls).toHaveLength(3);
-    expect(runner.calls[1]).toEqual(expect.arrayContaining(["--from", "okb", "--readable-amount", "0.001"]));
+    expect(runner.calls[1]).toEqual(expect.arrayContaining(["--from", "usdt", "--readable-amount", "0.08"]));
     expect(runner.calls[2]).toEqual(expect.arrayContaining(["--from", "usdt", "--readable-amount", "1"]));
   });
 

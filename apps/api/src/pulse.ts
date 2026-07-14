@@ -3,6 +3,8 @@ import type { EvidenceClaim, TransactionIntent } from "@prismpulse/schemas";
 
 const XLAYER_CHAIN_ID = 196;
 const APPROVE_SELECTOR = "095ea7b3";
+const TRANSFER_SELECTOR = "a9059cbb";
+const TRANSFER_FROM_SELECTOR = "23b872dd";
 const MAX_UINT256 = (1n << 256n) - 1n;
 
 interface JsonRpcResponse {
@@ -14,6 +16,7 @@ export interface PulseInspection {
   signals: SentinelSignals;
   evidence: EvidenceClaim[];
   blockNumber: string;
+  effectRecipient?: string;
 }
 
 export interface PulseOptions {
@@ -40,6 +43,25 @@ function isUnlimitedApproval(data: string): boolean {
   } catch {
     return false;
   }
+}
+
+function decodeAddressWord(body: string, wordIndex: number): string | undefined {
+  const start = 8 + wordIndex * 64;
+  const word = body.slice(start, start + 64);
+  if (word.length !== 64 || !/^[a-fA-F0-9]{64}$/.test(word)) return undefined;
+  return `0x${word.slice(24)}`;
+}
+
+export function deriveEffectRecipient(intent: TransactionIntent): string {
+  const body = intent.data.slice(2);
+  const selector = body.slice(0, 8).toLowerCase();
+  if (selector === TRANSFER_SELECTOR || selector === APPROVE_SELECTOR) {
+    return decodeAddressWord(body, 0) ?? intent.to;
+  }
+  if (selector === TRANSFER_FROM_SELECTOR) {
+    return decodeAddressWord(body, 1) ?? intent.to;
+  }
+  return intent.to;
 }
 
 async function rpcCall(
@@ -112,6 +134,7 @@ export async function collectXLayerEvidence(
   const blockNumber = BigInt(blockHex).toString(10);
   const code = requireHexResult(codeResponse, "contract code");
   const simulationSucceeded = simulationResponse.error === undefined;
+  const effectRecipient = deriveEffectRecipient(intent);
 
   const evidence: EvidenceClaim[] = [
     {
@@ -131,7 +154,11 @@ export async function collectXLayerEvidence(
       source: rpcUrl,
       observedAt,
       blockNumber,
-      value: { hasBytecode: code !== "0x" && code !== "0x0", byteLength: Math.max(0, (code.length - 2) / 2) },
+      value: {
+        hasBytecode: code !== "0x" && code !== "0x0",
+        byteLength: Math.max(0, (code.length - 2) / 2),
+        effectRecipient,
+      },
       confidence: 1,
       verified: true,
       stale: false,
@@ -168,6 +195,7 @@ export async function collectXLayerEvidence(
 
   return {
     blockNumber,
+    effectRecipient,
     signals: {
       simulationSucceeded,
       approvalIsUnlimited: isUnlimitedApproval(intent.data),

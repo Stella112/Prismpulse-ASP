@@ -61,6 +61,31 @@ async function loadMetadata() {
   }
 }
 
+async function loadHive() {
+  const core = document.querySelector("#hive-core-state");
+  const count = document.querySelector("#hive-signature-count");
+  const intake = document.querySelector("#hive-intake-state");
+  try {
+    const response = await fetch(`${API_BASE}/v1/hive/signatures`, {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const signatures = Array.isArray(payload.signatures) ? payload.signatures : [];
+    core.textContent = "Active";
+    core.className = "state-success";
+    count.textContent = String(signatures.filter((signature) => signature.active).length);
+    intake.textContent = "Online";
+    intake.className = "state-success";
+  } catch {
+    core.textContent = "Unavailable";
+    core.className = "state-warning";
+    count.textContent = "Unknown";
+    intake.textContent = "Unavailable";
+    intake.className = "state-warning";
+  }
+}
+
 function switchView(name) {
   const next = viewNames[name];
   if (!next) return;
@@ -90,6 +115,7 @@ function readIntent() {
   const data = document.querySelector("#calldata").value.trim();
   const declaredPurpose = document.querySelector("#purpose").value.trim();
   const expectedRecipient = document.querySelector("#expected-recipient").value.trim();
+  const transactionAmountUsd = Number(document.querySelector("#amount-usd").value);
 
   if (!addressPattern.test(from)) throw new Error("From must be a valid EVM address.");
   if (!addressPattern.test(to)) throw new Error("To must be a valid EVM address.");
@@ -101,6 +127,9 @@ function readIntent() {
   if (expectedRecipient && !addressPattern.test(expectedRecipient)) {
     throw new Error("Expected recipient must be a valid EVM address.");
   }
+  if (!Number.isFinite(transactionAmountUsd) || transactionAmountUsd < 0) {
+    throw new Error("Transaction amount must be a non-negative USD value.");
+  }
 
   return {
     chainId: 196,
@@ -109,6 +138,7 @@ function readIntent() {
     value,
     data,
     declaredPurpose,
+    transactionAmountUsd,
     ...(expectedRecipient ? { expectedRecipient } : {}),
   };
 }
@@ -360,3 +390,4 @@ document.querySelector("#copy-seal-link").addEventListener("click", async (event
 });
 
 loadMetadata();
+loadHive();

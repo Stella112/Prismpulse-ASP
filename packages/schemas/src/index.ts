@@ -96,6 +96,11 @@ export const evidenceSealSchema = z.object({
   verdict: sentinelVerdictSchema.shape.verdict,
   policyVersion: z.string(),
   createdAt: z.string().datetime(),
+  attestation: z.object({
+    scheme: z.literal("eip191"),
+    signer: addressSchema,
+    signature: z.string().regex(/^0x[a-fA-F0-9]{130}$/),
+  }).optional(),
 });
 
 export type TransactionIntent = z.infer<typeof transactionIntentSchema>;

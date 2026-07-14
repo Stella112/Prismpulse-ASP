@@ -3,23 +3,38 @@ pragma solidity ^0.8.28;
 
 import { PrismBondPool } from "../src/PrismBondPool.sol";
 
-interface Vm { function warp(uint256) external; }
+interface Vm {
+    function warp(uint256) external;
+}
 
 contract MockStablecoin {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
-    function mint(address to, uint256 amount) external { balanceOf[to] += amount; }
-    function approve(address spender, uint256 amount) external returns (bool) { allowance[msg.sender][spender] = amount; return true; }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
     function transfer(address to, uint256 amount) external returns (bool) {
         require(balanceOf[msg.sender] >= amount, "balance");
-        balanceOf[msg.sender] -= amount; balanceOf[to] += amount; return true;
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
     }
+
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         require(balanceOf[from] >= amount, "balance");
         uint256 allowed = allowance[from][msg.sender];
         require(allowed >= amount, "allowance");
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        balanceOf[from] -= amount; balanceOf[to] += amount; return true;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        return true;
     }
 }
 
@@ -40,7 +55,9 @@ contract PrismBondPoolTest {
 
     function setUp() public {
         token = new MockStablecoin();
-        pool = new PrismBondPool(address(token), address(this), address(this), TX_CAP, GLOBAL_CAP, 10_000, 1 days);
+        pool = new PrismBondPool(
+            address(token), address(this), address(this), TX_CAP, GLOBAL_CAP, 10_000, 1 days
+        );
         outsider = new UnauthorizedBondCaller();
         token.mint(address(this), 1_000_000);
         token.approve(address(pool), type(uint256).max);
@@ -48,7 +65,14 @@ contract PrismBondPoolTest {
     }
 
     function bind(uint96 amount) private returns (bytes32) {
-        return pool.bindCoverage(address(this), amount, 1_000, uint64(block.timestamp + 7 days), keccak256("sentinel"), keccak256("flagged-recipient-trigger"));
+        return pool.bindCoverage(
+            address(this),
+            amount,
+            1_000,
+            uint64(block.timestamp + 7 days),
+            keccak256("sentinel"),
+            keccak256("flagged-recipient-trigger")
+        );
     }
 
     function testStakePremiumAndImmediateCappedPayout() public {
@@ -80,7 +104,8 @@ contract PrismBondPoolTest {
         bytes32 id = bind(20_000);
         pool.requestPayout(id, keccak256("evidence"));
         pool.setPayoutsPaused(true);
-        (bool paidWhilePaused,) = address(pool).call(abi.encodeCall(PrismBondPool.finalizePayout, (id)));
+        (bool paidWhilePaused,) =
+            address(pool).call(abi.encodeCall(PrismBondPool.finalizePayout, (id)));
         require(!paidWhilePaused, "pause bypassed");
         pool.vetoPayout(id);
         (,,,,,,,, PrismBondPool.CoverageState state) = pool.coverages(id);
@@ -88,14 +113,38 @@ contract PrismBondPoolTest {
     }
 
     function testPerTransactionAndGlobalCapsEnforce() public {
-        (bool overPerTx,) = address(pool).call(
-            abi.encodeCall(PrismBondPool.bindCoverage, (address(this), uint96(TX_CAP + 1), uint96(1_000), uint64(block.timestamp + 1 days), keccak256("a"), keccak256("b")))
-        );
+        (bool overPerTx,) = address(pool)
+            .call(
+                abi.encodeCall(
+                    PrismBondPool.bindCoverage,
+                    (
+                        address(this),
+                        uint96(TX_CAP + 1),
+                        uint96(1_000),
+                        uint64(block.timestamp + 1 days),
+                        keccak256("a"),
+                        keccak256("b")
+                    )
+                )
+            );
         require(!overPerTx, "per transaction cap bypassed");
-        bind(TX_CAP); bind(TX_CAP); bind(TX_CAP);
-        (bool overGlobal,) = address(pool).call(
-            abi.encodeCall(PrismBondPool.bindCoverage, (address(this), uint96(1), uint96(1_000), uint64(block.timestamp + 1 days), keccak256("c"), keccak256("d")))
-        );
+        bind(TX_CAP);
+        bind(TX_CAP);
+        bind(TX_CAP);
+        (bool overGlobal,) = address(pool)
+            .call(
+                abi.encodeCall(
+                    PrismBondPool.bindCoverage,
+                    (
+                        address(this),
+                        uint96(1),
+                        uint96(1_000),
+                        uint64(block.timestamp + 1 days),
+                        keccak256("c"),
+                        keccak256("d")
+                    )
+                )
+            );
         require(!overGlobal, "global cap bypassed");
     }
 
@@ -107,17 +156,31 @@ contract PrismBondPoolTest {
 
     function testKillSwitchStopsNewCoverageAndPayouts() public {
         pool.setGlobalKillSwitch(true);
-        (bool bound,) = address(pool).call(
-            abi.encodeCall(PrismBondPool.bindCoverage, (address(this), uint96(1), uint96(1), uint64(block.timestamp + 1 days), keccak256("a"), keccak256("b")))
-        );
+        (bool bound,) = address(pool)
+            .call(
+                abi.encodeCall(
+                    PrismBondPool.bindCoverage,
+                    (
+                        address(this),
+                        uint96(1),
+                        uint96(1),
+                        uint64(block.timestamp + 1 days),
+                        keccak256("a"),
+                        keccak256("b")
+                    )
+                )
+            );
         require(!bound, "coverage bound while killed");
     }
 
     function testOnlyAuthorizedOracleCanRequestPayout() public {
         bytes32 id = bind(10_000);
-        (bool success,) = address(outsider).call(
-            abi.encodeCall(UnauthorizedBondCaller.request, (pool, id, keccak256("fake-evidence")))
-        );
+        (bool success,) = address(outsider)
+            .call(
+                abi.encodeCall(
+                    UnauthorizedBondCaller.request, (pool, id, keccak256("fake-evidence"))
+                )
+            );
         require(!success, "unauthorized oracle accepted");
     }
 }

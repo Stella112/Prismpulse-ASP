@@ -31,16 +31,14 @@ contract PrismSealRegistryTest {
         require(anchoredAt != 0, "missing timestamp");
         require(registry.isAnchored(digest), "seal not anchored");
 
-        (bool success,) = address(registry).call(
-            abi.encodeCall(PrismSealRegistry.anchorSeal, (digest))
-        );
+        (bool success,) =
+            address(registry).call(abi.encodeCall(PrismSealRegistry.anchorSeal, (digest)));
         require(!success, "duplicate seal accepted");
     }
 
     function testUnauthorizedIssuerCannotAnchor() public {
-        (bool success,) = address(caller).call(
-            abi.encodeCall(RegistryCaller.anchor, (registry, keccak256("unauthorized")))
-        );
+        (bool success,) = address(caller)
+            .call(abi.encodeCall(RegistryCaller.anchor, (registry, keccak256("unauthorized"))));
         require(!success, "unauthorized issuer accepted");
     }
 
