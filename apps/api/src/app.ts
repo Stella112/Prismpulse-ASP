@@ -12,7 +12,7 @@ import type { TransactionIntent } from "@prismpulse/schemas";
 import { z } from "zod";
 import { createPaymentGate } from "./payments.js";
 import { createHiveStore, type HiveStore } from "./hive.js";
-import { createLocalReasoner, type LocalReasoner } from "./reasoner.js";
+import { arbitratePayloadAssessments, createLocalReasoner, type LocalReasoner } from "./reasoner.js";
 import { createSealRegistry, type SealRegistry } from "./registry.js";
 import { attestSeal, verifySealRecord } from "./seal-attestation.js";
 import {
@@ -252,9 +252,12 @@ export function createApp(options: AppOptions = {}): Express {
     const deterministicInspection = inspectPayloadText(payload);
     const modelInspection = await reasoner.inspectPayload(payload);
     const hive = await (await hiveStorePromise).inspect(payload, [intent.to]);
-    const payloadStatus: PayloadInspectionStatus = deterministicInspection.status === "BLOCK" || modelInspection.status === "BLOCK"
-      ? "BLOCK"
-      : deterministicInspection.status === "UNKNOWN" || modelInspection.status === "UNKNOWN" ? "UNKNOWN" : "PASS";
+    const payloadArbitration = arbitratePayloadAssessments(
+      deterministicInspection,
+      modelInspection,
+      Number(process.env.LLAMA_BLOCK_CONFIDENCE_MIN ?? 0.9),
+    );
+    const payloadStatus: PayloadInspectionStatus = payloadArbitration.status;
     const amountUsd = intent.transactionAmountUsd ?? (intent.value === "0" ? 0 : undefined);
     const effectRecipient = (inspection.effectRecipient ?? intent.to).toLowerCase();
     const knownCounterparties = new Set(
@@ -281,8 +284,8 @@ export function createApp(options: AppOptions = {}): Express {
         source: process.env.OLLAMA_BASE_URL ?? "http://ollama:11434",
         observedAt: new Date().toISOString(),
         blockNumber: inspection.blockNumber,
-        value: modelInspection,
-        confidence: modelInspection.confidence,
+        value: { assessment: modelInspection, arbitration: payloadArbitration },
+        confidence: payloadArbitration.confidence,
         verified: modelInspection.status !== "UNKNOWN",
         stale: false,
       },
@@ -291,7 +294,7 @@ export function createApp(options: AppOptions = {}): Express {
       ...inspection.signals,
       payloadInspection: {
         status: payloadStatus,
-        confidence: Math.min(deterministicInspection.confidence, modelInspection.confidence),
+        confidence: payloadArbitration.confidence,
       },
       effectRecipientMatches: intent.expectedRecipient
         ? intent.expectedRecipient.toLowerCase() === effectRecipient

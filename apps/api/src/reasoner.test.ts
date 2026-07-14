@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createLocalReasoner } from "./reasoner.js";
+import { arbitratePayloadAssessments, createLocalReasoner } from "./reasoner.js";
 
 describe("createLocalReasoner", () => {
   it("returns a structured local model assessment", async () => {
@@ -33,4 +33,27 @@ describe("createLocalReasoner", () => {
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+describe("arbitratePayloadAssessments", () => {
+  it("dismisses an uncorroborated low-confidence model block", () => {
+    expect(arbitratePayloadAssessments(
+      { status: "PASS", confidence: 0.9 },
+      { status: "BLOCK", confidence: 0.8, reasons: ["instruction override"] },
+    )).toMatchObject({ status: "PASS", decision: "MODEL_BLOCK_DISMISSED" });
+  });
+
+  it("keeps high-confidence model blocks load-bearing", () => {
+    expect(arbitratePayloadAssessments(
+      { status: "PASS", confidence: 0.9 },
+      { status: "BLOCK", confidence: 0.98, reasons: ["concealed redirect"] },
+    )).toMatchObject({ status: "BLOCK", decision: "MODEL_BLOCK" });
+  });
+
+  it("never lets the model override a deterministic block", () => {
+    expect(arbitratePayloadAssessments(
+      { status: "BLOCK", confidence: 1 },
+      { status: "PASS", confidence: 1, reasons: [] },
+    )).toMatchObject({ status: "BLOCK", decision: "DETERMINISTIC_BLOCK" });
+  });
+});
 });
