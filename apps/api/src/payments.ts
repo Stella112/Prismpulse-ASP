@@ -16,6 +16,10 @@ const paymentConfigSchema = z.object({
     .string()
     .regex(/^\$\d+(?:\.\d{1,6})?$/)
     .default("$0.01"),
+  MARKET_ADVICE_PRICE_USD: z
+    .string()
+    .regex(/^\$\d+(?:\.\d{1,6})?$/)
+    .default("$0.03"),
 });
 
 export type PaymentGate =
@@ -58,6 +62,17 @@ export function createPaymentGate(
           maxTimeoutSeconds: 300,
         },
         description: "Evidence-backed PrismPulse Sentinel transaction check. Request schema and example: https://api.getprismpulse.xyz/v1/sentinel/schema",
+        mimeType: "application/json",
+      },
+      "POST /v1/market/advice": {
+        accepts: {
+          scheme: "exact",
+          network: "eip155:196",
+          payTo: parsed.data.PAY_TO_ADDRESS,
+          price: parsed.data.MARKET_ADVICE_PRICE_USD,
+          maxTimeoutSeconds: 300,
+        },
+        description: "Evidence-backed X Layer market prediction and trading advice. Request schema and example: https://api.getprismpulse.xyz/v1/market/schema",
         mimeType: "application/json",
       },
     },

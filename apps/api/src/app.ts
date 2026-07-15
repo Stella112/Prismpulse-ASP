@@ -32,6 +32,18 @@ import {
   EvidenceUnavailableError,
   type PulseInspection,
 } from "./pulse.js";
+import {
+  createMarketAdvicePreSettlement,
+  createMarketAdviceService,
+  formatMarketAdviceValidationError,
+  MARKET_ADVICE_REQUEST_EXAMPLE,
+  MARKET_ADVICE_REQUEST_SCHEMA,
+  MARKET_ADVICE_SCHEMA_PATH,
+  marketAdviceRequestSchema,
+  type MarketAdvice,
+  type MarketAdviceServiceLike,
+  normalizeMarketAdviceRequest as normalizeMarketAdviceRequestForRoute,
+} from "./market-advice.js";
 
 const checkRequestSchema = z.object({
   intent: transactionIntentSchema,
@@ -54,6 +66,7 @@ export interface AppOptions {
   sealRegistry?: SealRegistry;
   hiveStore?: HiveStore;
   reasoner?: LocalReasoner;
+  marketAdvice?: MarketAdviceServiceLike;
   paymentGate?: PaymentGate;
 }
 
@@ -90,6 +103,7 @@ export function createApp(options: AppOptions = {}): Express {
   const app = express();
   const paymentGate = options.paymentGate ?? createPaymentGate(process.env);
   const collectEvidence = options.collectEvidence ?? collectXLayerEvidence;
+  const marketAdvice = options.marketAdvice ?? createMarketAdviceService(process.env);
   const sealStore = options.sealStore ?? createEvidenceSealStore(process.env);
   const sealRegistry = options.sealRegistry ?? createSealRegistry(process.env);
   const hiveStorePromise = options.hiveStore ? Promise.resolve(options.hiveStore) : createHiveStore(process.env);
@@ -104,6 +118,7 @@ export function createApp(options: AppOptions = {}): Express {
   app.use(cors({ origin: false }));
   app.use(express.json({ limit: "256kb" }));
   app.use(validateSentinelBeforeSettlement);
+  app.use(createMarketAdvicePreSettlement(marketAdvice));
   if (paymentGate.enabled) {
     app.use(paymentGate.middleware);
   }
@@ -117,6 +132,13 @@ export function createApp(options: AppOptions = {}): Express {
       .setHeader("Cache-Control", "public, max-age=300")
       .type("application/schema+json")
       .json(SENTINEL_REQUEST_SCHEMA);
+  });
+
+  app.get(MARKET_ADVICE_SCHEMA_PATH, (_request, response) => {
+    response
+      .setHeader("Cache-Control", "public, max-age=300")
+      .type("application/schema+json")
+      .json(MARKET_ADVICE_REQUEST_SCHEMA);
   });
 
   app.get("/v1/readiness", async (_request, response) => {
@@ -166,6 +188,8 @@ export function createApp(options: AppOptions = {}): Express {
       "five-check-sentinel",
       "passive-hive-immunization",
       "local-llama-reasoning",
+      "market-intelligence-trading-advice",
+      "okx-market-price-liquidity-candles-signals",
       ...(autonomousExecution ? ["bounded-dex-execution"] : []),
       ...(gasVault ? ["gas-vault-auto-refill"] : []),
       ...(a2a ? ["a2a-negotiation-escrow-delivery-disputes"] : []),
@@ -202,6 +226,17 @@ export function createApp(options: AppOptions = {}): Express {
             "https://api.getprismpulse.xyz" + SENTINEL_SCHEMA_PATH,
           requestSchema: SENTINEL_REQUEST_SCHEMA,
           exampleRequest: SENTINEL_REQUEST_EXAMPLE,
+        },
+        {
+          name: "market-advice",
+          method: "POST",
+          endpoint: "https://api.getprismpulse.xyz/v1/market/advice",
+          price: process.env.MARKET_ADVICE_PRICE_USD ?? "$0.03",
+          paymentProtocol: "x402",
+          requestSchemaUrl:
+            "https://api.getprismpulse.xyz" + MARKET_ADVICE_SCHEMA_PATH,
+          requestSchema: MARKET_ADVICE_REQUEST_SCHEMA,
+          exampleRequest: MARKET_ADVICE_REQUEST_EXAMPLE,
         },
       ],
     });
@@ -385,6 +420,32 @@ export function createApp(options: AppOptions = {}): Express {
       }
     },
   );
+
+  app.post("/v1/market/advice", async (request, response) => {
+    if (process.env.NODE_ENV === "production" && !paymentGate.enabled) {
+      response.status(503).json({
+        error: "PAID_ROUTE_NOT_CONFIGURED",
+        message: "Market advice is unavailable until payment verification is enabled.",
+      });
+      return;
+    }
+    const parsed = marketAdviceRequestSchema.safeParse(
+      normalizeMarketAdviceRequestForRoute(request.body),
+    );
+    if (!parsed.success) {
+      response.status(400).json(formatMarketAdviceValidationError(parsed.error));
+      return;
+    }
+    try {
+      const prefetched = response.locals.marketAdvice as MarketAdvice | undefined;
+      response.status(201).json(prefetched ?? (await marketAdvice.analyze(parsed.data)));
+    } catch (error) {
+      response.status(503).json({
+        error: "MARKET_DATA_UNAVAILABLE",
+        message: error instanceof Error ? error.message : "Market evidence is unavailable.",
+      });
+    }
+  });
 
   app.post("/v1/sentinel/check", async (request, response) => {
     if (process.env.NODE_ENV === "production" && !paymentGate.enabled) {
