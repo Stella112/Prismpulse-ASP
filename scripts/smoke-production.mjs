@@ -28,8 +28,14 @@ if (requireRegistry && !metadata.registry?.workerEnabled) {
   throw new Error("Seal registry issuer worker is not enabled");
 }
 
-const consolePage = await (await checked("/")).text();
-if (!consolePage.includes("PrismPulse Console")) throw new Error("Console HTML marker is missing");
+const landingPage = await (await checked("/")).text();
+if (!landingPage.includes("Risk intelligence") || !landingPage.includes('id="pulse"')) {
+  throw new Error("Landing page marker is missing");
+}
+const consolePage = await (await checked("/console.html")).text();
+if (!consolePage.includes("PrismPulse Pulse Console")) {
+  throw new Error("Pulse Console HTML marker is missing");
+}
 
 if (process.env.SMOKE_ISSUE_SEAL === "true") {
   if (!metadata.consoleIssuanceEnabled) throw new Error("Console issuance is not enabled");

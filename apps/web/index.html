@@ -3,194 +3,340 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b0d0e" />
+    <meta name="theme-color" content="#070912" />
     <meta
       name="description"
-      content="PrismPulse transaction evidence and underwriting console for X Layer."
+      content="PrismPulse is the X Layer risk intelligence and underwriting layer for agents, traders, businesses, and Web2 users."
     />
-    <title>PrismPulse Console</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <meta property="og:title" content="PrismPulse — Risk intelligence before capital moves" />
+    <meta
+      property="og:description"
+      content="Inspect, predict, prove, execute, and cover on X Layer."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://getprismpulse.xyz/" />
+    <meta property="og:image" content="https://getprismpulse.xyz/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://getprismpulse.xyz/og.png" />
+    <title>PrismPulse — The Underwriter of the Agent Economy</title>
+    <link rel="icon" href="/prismpulse-logo.jpg" />
+    <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <a class="brand" href="#pulse" aria-label="PrismPulse Pulse Console">
-          <span class="brand-mark" aria-hidden="true"><i></i></span>
-          <span><strong>PrismPulse</strong><small>Transaction intelligence</small></span>
-        </a>
+    <header class="site-header">
+      <a class="brand" href="#pulse" aria-label="PrismPulse home">
+        <img src="/prismpulse-logo.jpg" alt="" width="44" height="44" />
+        <span><strong>PrismPulse</strong><small>Underwriter of the agent economy</small></span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#system">System</a>
+        <a href="#services">Services</a>
+        <a href="#proof">Proof</a>
+      </nav>
+      <a
+        class="header-cta"
+        href="https://www.okx.ai/agents/5738?source=search"
+        target="_blank"
+        rel="noreferrer"
+      >Use on OKX.AI <span aria-hidden="true">↗</span></a>
+    </header>
 
-        <nav class="primary-nav" aria-label="Primary navigation">
-          <button class="nav-item active" data-view="pulse" type="button">
-            <span aria-hidden="true">P</span>Pulse
-          </button>
-          <button class="nav-item" data-view="seals" type="button">
-            <span aria-hidden="true">S</span>Seals
-          </button>
-          <button class="nav-item" data-view="hive" type="button">
-            <span aria-hidden="true">H</span>Hive
-          </button>
-          <button class="nav-item" data-view="system" type="button">
-            <span aria-hidden="true">O</span>System
-          </button>
-        </nav>
-
-        <div class="sidebar-foot">
-          <div class="network-state">
-            <span class="status-dot" id="sidebar-status"></span>
-            <span><strong>X Layer</strong><small>Chain 196</small></span>
+    <main>
+      <section class="hero" id="pulse">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <div class="eyebrow-row">
+            <span class="live-dot"></span>
+            LIVE ON X LAYER
+            <span class="eyebrow-divider"></span>
+            ASP #5738
+          </div>
+          <h1>Risk intelligence<br /><span>before capital moves.</span></h1>
+          <p class="hero-lead">
+            PrismPulse inspects, predicts, proves, executes, and underwrites on-chain
+            activity for agents, traders, businesses, and Web2 users.
+          </p>
+          <div class="hero-actions">
+            <a
+              class="button button-primary"
+              href="https://www.okx.ai/agents/5738?source=search"
+              target="_blank"
+              rel="noreferrer"
+            >Use PrismPulse <span aria-hidden="true">↗</span></a>
+            <a class="button button-secondary" href="/console.html#pulse">
+              Open live console <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <div class="hero-footnote">
+            <span>Built for OKX.AI Genesis</span>
+            <span>X Layer · Chain 196</span>
+            <span>x402 payments</span>
           </div>
         </div>
-      </aside>
 
-      <main>
-        <header class="topbar">
+        <div class="hero-visual" aria-label="PrismPulse live system summary">
+          <div class="orbit orbit-one" aria-hidden="true"></div>
+          <div class="orbit orbit-two" aria-hidden="true"></div>
+          <div class="logo-core">
+            <span class="core-glow" aria-hidden="true"></span>
+            <img
+              src="/prismpulse-logo.jpg"
+              alt="PrismPulse neon prism and pulse logo"
+              width="512"
+              height="512"
+            />
+          </div>
+          <div class="signal-card signal-card-a">
+            <span>SENTINEL</span><strong>5 / 5 checks</strong><small><i></i> Policy active</small>
+          </div>
+          <div class="signal-card signal-card-b">
+            <span>PRISMBOND</span><strong>Coverage ready</strong><small><i></i> Pool deployed</small>
+          </div>
+          <div class="signal-card signal-card-c">
+            <span>MARKET</span><strong>Cross-asset</strong><small><i></i> Evidence live</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-rail" aria-label="PrismPulse platform features">
+        <span>OKX.AI LISTED</span><i></i><span>X LAYER MAINNET</span><i></i>
+        <span>REAL x402 SETTLEMENT</span><i></i><span>PUBLIC SCHEMAS</span>
+      </section>
+
+      <section class="section" id="system">
+        <div class="section-heading">
           <div>
-            <p class="eyebrow">PRISMPULSE / <span id="view-crumb">PULSE</span></p>
-            <h1 id="view-title">Pulse Console</h1>
+            <p class="section-kicker">ONE SOVEREIGN RISK LAYER</p>
+            <h2>From intent to insured execution.</h2>
           </div>
-          <div class="topbar-status" aria-live="polite">
-            <span class="status-dot" id="api-dot"></span>
-            <span id="api-status">Connecting</span>
+          <p>
+            PrismPulse combines pre-transaction defense, market reasoning, empirical
+            micro-proving, autonomous execution, and staked-capital underwriting in
+            one production system.
+          </p>
+        </div>
+
+        <div class="capability-grid">
+          <article class="capability-card">
+            <span class="card-number">01</span>
+            <div class="card-icon shield-icon" aria-hidden="true"></div>
+            <h3>Five-part Sentinel</h3>
+            <p>Inspects payloads, counterparties, simulated effects, Hive anomalies, and spend policy before value moves.</p>
+            <small>ALLOW · REVIEW · BLOCK</small>
+          </article>
+          <article class="capability-card">
+            <span class="card-number">02</span>
+            <div class="card-icon chart-icon" aria-hidden="true"></div>
+            <h3>Market intelligence</h3>
+            <p>Evidence-backed predictions and trading advice across tokens, majors, stablecoins, DeFi assets, and memes.</p>
+            <small>SCAN · REASON · MICRO-PROVE</small>
+          </article>
+          <article class="capability-card">
+            <span class="card-number">03</span>
+            <div class="card-icon bond-icon" aria-hidden="true"></div>
+            <h3>PrismBond coverage</h3>
+            <p>Staked capital underwrites eligible agent actions with explicit caps, delayed payouts, and guardian controls.</p>
+            <small>STAKE · COVER · COMPENSATE</small>
+          </article>
+          <article class="capability-card">
+            <span class="card-number">04</span>
+            <div class="card-icon loop-icon" aria-hidden="true"></div>
+            <h3>Autonomous operations</h3>
+            <p>Guarded DEX execution, GasVault refilling, local Llama reasoning, and A2A task delivery keep the agent running.</p>
+            <small>EARN · PAY · REFILL · REPEAT</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="section sentinel-section">
+        <div class="sentinel-copy">
+          <p class="section-kicker">THE FIVE-PART SENTINEL</p>
+          <h2>Machine-speed decisions.<br /><span>Human-grade judgment.</span></h2>
+          <p>
+            Every request produces a field-readable verdict with evidence, policy context,
+            decision digests, and a signed PrismSeal—not a mystery score.
+          </p>
+          <a
+            class="text-link"
+            href="https://api.getprismpulse.xyz/v1/sentinel/schema"
+            target="_blank"
+            rel="noreferrer"
+          >View public request schema <span aria-hidden="true">↗</span></a>
+        </div>
+        <ol class="check-list">
+          <li><span>01</span><div><strong>Payload inspection</strong><p>Decode calldata, approvals, value flow, and contract interaction.</p></div><i>LIVE</i></li>
+          <li><span>02</span><div><strong>Counterparty intelligence</strong><p>Assess bytecode, recipient identity, and known risk signals.</p></div><i>LIVE</i></li>
+          <li><span>03</span><div><strong>Intent guard</strong><p>Compare simulated effects with the user’s plain-language purpose.</p></div><i>LIVE</i></li>
+          <li><span>04</span><div><strong>Hive anomaly scan</strong><p>Match shared signatures and propagated threat evidence.</p></div><i>LIVE</i></li>
+          <li><span>05</span><div><strong>Spend circuit breaker</strong><p>Enforce value, recipient, slippage, and exposure boundaries.</p></div><i>LIVE</i></li>
+        </ol>
+      </section>
+
+      <section class="section market-section">
+        <div class="market-terminal" aria-label="Example PrismPulse market intelligence">
+          <div class="terminal-head">
+            <span><i></i><i></i><i></i></span><strong>PRISMPULSE / MARKET INTELLIGENCE</strong><small>LIVE</small>
           </div>
-        </header>
-
-        <section class="view active" id="view-pulse" aria-labelledby="view-title">
-          <div class="metrics-band">
-            <div><span>Network</span><strong>eip155:196</strong></div>
-            <div><span>Evidence source</span><strong id="rpc-label">X Layer RPC</strong></div>
-            <div><span>Payment rail</span><strong id="payment-state">Checking</strong></div>
-            <div><span>Seal registry</span><strong id="registry-state">Checking</strong></div>
+          <div class="terminal-asset">
+            <div><span>ASSET</span><strong>Any supported X Layer asset</strong></div>
+            <span class="verdict-chip">CONDITIONAL BUY</span>
           </div>
-
-          <div class="workspace-grid">
-            <form class="inspection-panel" id="inspection-form" novalidate>
-              <div class="panel-heading">
-                <div><p class="section-label">TRANSACTION INTENT</p><h2>Inspect on X Layer</h2></div>
-                <span class="chain-chip">196</span>
-              </div>
-
-              <label>
-                From
-                <input id="from" name="from" autocomplete="off" spellcheck="false" placeholder="0x..." required />
-              </label>
-              <label>
-                To
-                <input id="to" name="to" autocomplete="off" spellcheck="false" placeholder="0x..." required />
-              </label>
-
-              <div class="form-row">
-                <label>
-                  Value (wei)
-                  <input id="value" name="value" inputmode="numeric" value="0" required />
-                </label>
-                <label>
-                  Expected recipient
-                  <input id="expected-recipient" name="expectedRecipient" autocomplete="off" spellcheck="false" placeholder="Optional" />
-                </label>
-              </div>
-
-              <label>
-                Transaction amount (USD)
-                <input id="amount-usd" name="transactionAmountUsd" inputmode="decimal" type="number" min="0" step="0.000001" value="0" required />
-              </label>
-
-              <label>
-                Calldata
-                <textarea id="calldata" name="data" rows="3" spellcheck="false">0x</textarea>
-              </label>
-              <label>
-                Declared purpose
-                <input id="purpose" name="declaredPurpose" maxlength="500" placeholder="Describe the intended outcome" required />
-              </label>
-
-              <div class="form-error" id="form-error" role="alert"></div>
-              <div class="form-actions">
-                <button class="primary-action" id="inspect-button" type="submit">
-                  <span>Run Pulse</span><span aria-hidden="true">-&gt;</span>
-                </button>
-                <button class="secondary-action" id="clear-button" type="button">Clear</button>
-              </div>
-            </form>
-
-            <section class="result-panel" aria-live="polite">
-              <div class="panel-heading">
-                <div><p class="section-label">LIVE EVIDENCE</p><h2>Inspection result</h2></div>
-                <span class="result-state idle" id="result-state">Idle</span>
-              </div>
-
-              <div class="empty-state" id="empty-result">
-                <div class="pulse-visual" aria-hidden="true"><span></span><i></i></div>
-                <strong>No active inspection</strong>
-              </div>
-
-              <div class="result-content" id="result-content" hidden>
-                <div class="signal-grid" id="signal-grid"></div>
-                <div class="evidence-heading">
-                  <span>Evidence claims</span><span id="block-number">Block -</span>
-                </div>
-                <div class="evidence-list" id="evidence-list"></div>
-                <button class="seal-action" id="seal-button" type="button" disabled>
-                  Underwrite and Seal
-                </button>
-                <p class="action-note" id="seal-note">Payment setup pending.</p>
-              </div>
-            </section>
+          <div class="terminal-chart" aria-hidden="true">
+            <span class="chart-line line-a"></span><span class="chart-line line-b"></span>
+            <span class="chart-line line-c"></span><i class="chart-dot dot-a"></i>
+            <i class="chart-dot dot-b"></i>
           </div>
-        </section>
-
-        <section class="view" id="view-seals" aria-labelledby="view-title">
-          <div class="section-intro">
-            <p class="section-label">EVIDENCE RECEIPTS</p>
-            <p>Canonical decision digests issued by Sentinel.</p>
+          <div class="terminal-metrics">
+            <div><span>CONFIDENCE</span><strong>82%</strong></div>
+            <div><span>RISK</span><strong>MODERATE</strong></div>
+            <div><span>PROBE</span><strong>PASS</strong></div>
           </div>
-          <div class="seal-layout">
-            <form class="inspection-panel" id="seal-form">
-              <div class="panel-heading"><div><h2>Find a sealed decision</h2></div><span class="chain-chip">v1</span></div>
-              <label>Decision digest<input id="seal-digest" spellcheck="false" autocomplete="off" placeholder="0x..." /></label>
-              <p class="explorer-help">Enter the canonical digest returned by Sentinel. Persisted intent, verdict, and evidence are loaded from PrismPulse.</p>
-              <div class="form-error" id="seal-error" role="alert"></div>
-              <button class="primary-action" id="seal-search-button" type="submit"><span>Retrieve Seal</span><span aria-hidden="true">-&gt;</span></button>
-            </form>
-            <section class="result-panel">
-              <div class="panel-heading"><div><p class="section-label">RECEIPT</p><h2>Seal details</h2></div></div>
-              <div class="empty-state compact" id="seal-empty"><strong>No receipt loaded</strong></div>
-              <div id="seal-result" hidden>
-                <div class="seal-toolbar">
-                  <span class="result-state idle" id="anchor-state">Checking anchor</span>
-                  <button class="secondary-action" id="copy-seal-link" type="button">Copy share link</button>
-                </div>
-                <dl class="seal-details" id="seal-details"></dl>
-                <p class="explorer-help" id="anchor-detail"></p>
-                <div class="evidence-heading"><span>Decision evidence</span><span id="seal-evidence-count"></span></div>
-                <div class="evidence-list" id="seal-evidence-list"></div>
-              </div>
-            </section>
+          <ul>
+            <li><i></i>Liquidity and route quality verified</li>
+            <li><i></i>Contract, tax, and honeypot signals checked</li>
+            <li><i></i>Narrative and market evidence reviewed locally</li>
+          </ul>
+        </div>
+        <div class="market-copy">
+          <p class="section-kicker">BEYOND MEME TOKENS</p>
+          <h2>Understand the market.<br /><span>Then prove the route.</span></h2>
+          <p>
+            PrismPulse retains its original high-velocity meme intelligence, but now
+            evaluates every supported asset class: majors, emerging tokens, stablecoins,
+            DeFi assets, and agent-requested opportunities.
+          </p>
+          <div class="asset-tags">
+            <span>MEMES</span><span>MAJORS</span><span>STABLECOINS</span>
+            <span>DEFI</span><span>NEW LISTINGS</span>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section class="view" id="view-hive" aria-labelledby="view-title">
-          <div class="section-intro"><p class="section-label">SIGNATURE INTELLIGENCE</p><p>Reviewed attack patterns available to Sentinel.</p></div>
-          <div class="state-table">
-            <div class="table-head"><span>Registry</span><span>Status</span><span>Activation</span></div>
-            <div class="table-row"><strong>Hive Core</strong><span id="hive-core-state">Checking</span><span>Sentinel propagation</span></div>
-            <div class="table-row"><strong>Known signatures</strong><span id="hive-signature-count">Checking</span><span>Active production entries</span></div>
-            <div class="table-row"><strong>Honeypot intake</strong><span id="hive-intake-state">Checking</span><span>Authenticated capture endpoint</span></div>
+      <section class="section services-section" id="services">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">AVAILABLE ON OKX.AI</p>
+            <h2>Three ways to use PrismPulse.</h2>
           </div>
-        </section>
+          <p>Clear inputs, public schemas, standard x402 challenges, and structured outputs agents can use immediately.</p>
+        </div>
+        <div class="service-grid">
+          <article class="service-card featured">
+            <div class="service-top"><span>01 / SAFETY</span><i>POPULAR</i></div>
+            <h3>Sentinel Transaction Check</h3>
+            <p>Preflight a transaction before signing and receive a structured ALLOW, REVIEW, or BLOCK verdict.</p>
+            <ul><li>Five-part risk inspection</li><li>Evidence-backed verdict</li><li>Signed PrismSeal receipt</li></ul>
+            <div class="service-price"><strong>0.01 <small>USDT</small></strong><span>PER CALL</span></div>
+          </article>
+          <article class="service-card">
+            <div class="service-top"><span>02 / INTELLIGENCE</span></div>
+            <h3>Market Intelligence</h3>
+            <p>Request prediction and trading advice for any supported asset, including meme-token opportunities.</p>
+            <ul><li>Cross-asset analysis</li><li>Local Llama reasoning</li><li>Risk-aware action plan</li></ul>
+            <div class="service-price"><strong>0.03 <small>USDT</small></strong><span>PER CALL</span></div>
+          </article>
+          <article class="service-card">
+            <div class="service-top"><span>03 / UNDERWRITING</span></div>
+            <h3>Agent Risk Underwriting</h3>
+            <p>Negotiate risk review, guarded execution, and coverage for complex A2A tasks.</p>
+            <ul><li>A2A negotiation</li><li>Escrow lifecycle</li><li>Coverage-aware delivery</li></ul>
+            <div class="service-price"><strong>0.03 <small>USDT</small></strong><span>BASE PRICE</span></div>
+          </article>
+        </div>
+        <div class="services-action">
+          <a
+            class="button button-primary"
+            href="https://www.okx.ai/agents/5738?source=search"
+            target="_blank"
+            rel="noreferrer"
+          >Open ASP #5738 <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
 
-        <section class="view" id="view-system" aria-labelledby="view-title">
-          <div class="section-intro"><p class="section-label">RUNTIME</p><p>Current production service boundaries.</p></div>
-          <div class="state-table" id="system-table">
-            <div class="table-head"><span>Service</span><span>Status</span><span>Endpoint</span></div>
-            <div class="table-row"><strong>Sentinel API</strong><span id="system-api">Checking</span><span>api.getprismpulse.xyz</span></div>
-            <div class="table-row"><strong>X Layer RPC</strong><span>Configured</span><span>rpc.xlayer.tech</span></div>
-            <div class="table-row"><strong>Seal Registry</strong><span class="state-warning" id="system-registry">Checking</span><span id="system-registry-endpoint">Mainnet boundary</span></div>
-            <div class="table-row"><strong>OKX Payments</strong><span id="system-payments">Checking</span><span>Exact / X Layer</span></div>
-          </div>
-        </section>
-      </main>
-    </div>
+      <section class="section proof-section" id="proof">
+        <div class="proof-copy">
+          <p class="section-kicker">DON’T TRUST. VERIFY.</p>
+          <h2>Deployed contracts.<br /><span>Real payment proof.</span></h2>
+          <p>PrismPulse exposes the infrastructure behind its claims so buyers and judges can verify the system directly on X Layer.</p>
+          <a
+            class="text-link"
+            href="https://www.oklink.com/x-layer/tx/0x6dccf3719efc7656ea1e4ea146e332b7f54e409def261cf87b75d42d7bd9aa43"
+            target="_blank"
+            rel="noreferrer"
+          >View verified payment transaction <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="proof-ledger">
+          <div><span>AGENTIC WALLET</span><strong>0xb8c5...9756</strong><small>X Layer · eip155:196</small></div>
+          <div><span>x402 PAY-TO</span><strong>0x8db0...399b</strong><small>USDT0 settlement</small></div>
+          <div><span>PRISMSEAL REGISTRY</span><strong>0x86f9...dE3c</strong><small>Evidence anchoring</small></div>
+          <div><span>PRISMBOND POOL</span><strong>0xB51F...a366</strong><small>Staked-capital coverage</small></div>
+          <div class="ledger-wide"><span>LAST VERIFIED PAID CALL</span><strong>HTTP 201 · SETTLED ON X LAYER</strong><small>Standard 402 challenge → payment → deliverable</small></div>
+        </div>
+      </section>
 
-    <script src="/app.js" defer></script>
+      <section class="section web2-section">
+        <div>
+          <p class="section-kicker">FOR PEOPLE, NOT JUST PROTOCOLS</p>
+          <h2>Web2-simple.<br /><span>On-chain underneath.</span></h2>
+        </div>
+        <div class="web2-steps">
+          <div><span>1</span><p><strong>Describe what you want.</strong> Paste a wallet action, contract, token, or business intent in plain language.</p></div>
+          <div><span>2</span><p><strong>PrismPulse does the hard work.</strong> It checks, reasons, verifies, and returns a readable recommendation.</p></div>
+          <div><span>3</span><p><strong>You stay in control.</strong> See the evidence before any execution, payment, or covered action proceeds.</p></div>
+        </div>
+      </section>
+
+      <section class="section faq-section">
+        <p class="section-kicker">COMMON QUESTIONS</p>
+        <h2>Built for informed autonomy.</h2>
+        <div class="faq-grid">
+          <details>
+            <summary>Is PrismPulse only for meme coins?</summary>
+            <p>No. Meme intelligence remains a core specialty, but the market service supports any compatible asset and the Sentinel protects general X Layer transactions.</p>
+          </details>
+          <details>
+            <summary>Does PrismPulse take control of my wallet?</summary>
+            <p>No. PrismPulse evaluates and proposes actions within explicit policies. Guarded execution occurs only through configured wallet authority and limits.</p>
+          </details>
+          <details>
+            <summary>Can non-crypto businesses use it?</summary>
+            <p>Yes. Web2 users can submit plain-language workflows, API calls, vendor payments, and treasury actions without understanding calldata.</p>
+          </details>
+          <details>
+            <summary>What makes the verdict verifiable?</summary>
+            <p>Sentinel includes source evidence, block context, policy version, digests, and a signed PrismSeal that can be anchored in the on-chain registry.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <div class="final-glow" aria-hidden="true"></div>
+        <img src="/prismpulse-logo.jpg" alt="" width="96" height="96" />
+        <p class="section-kicker">THE AGENT ECONOMY NEEDS AN UNDERWRITER</p>
+        <h2>Move at machine speed.<br /><span>Keep human-grade judgment.</span></h2>
+        <div class="hero-actions">
+          <a
+            class="button button-primary"
+            href="https://www.okx.ai/agents/5738?source=search"
+            target="_blank"
+            rel="noreferrer"
+          >Use PrismPulse on OKX.AI <span aria-hidden="true">↗</span></a>
+          <a class="button button-secondary" href="/console.html#pulse">Open live console <span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <a class="brand footer-brand" href="#pulse">
+        <img src="/prismpulse-logo.jpg" alt="" width="38" height="38" />
+        <span><strong>PrismPulse</strong><small>Built on X Layer</small></span>
+      </a>
+      <p>Inspect · Predict · Prove · Execute · Cover</p>
+      <div>
+        <a href="https://www.okx.ai/agents/5738?source=search" target="_blank" rel="noreferrer">OKX.AI</a>
+        <a href="https://github.com/Stella112/prismpulse-trader" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://api.getprismpulse.xyz/v1/sentinel/schema" target="_blank" rel="noreferrer">API Schema</a>
+      </div>
+    </footer>
   </body>
 </html>
